@@ -339,13 +339,14 @@ body, html {
 
 /* Presets de cámara */
 .cam-presets-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
+    display: flex;
+    flex-wrap: wrap;
     gap: 4px;
     margin-top: 2px;
 }
 
 .btn-cam-preset {
+    flex: 1 1 calc(33.333% - 4px);
     background: rgba(255, 255, 255, 0.05);
     border: 1px solid var(--border-subtle);
     border-radius: 4px;

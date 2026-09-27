@@ -93,6 +93,8 @@ export class HUD {
                         <button class="btn-cam-preset active" data-preset="iso">Isométrica</button>
                         <button class="btn-cam-preset" data-preset="side">Lateral</button>
                         <button class="btn-cam-preset" data-preset="tanks">Tanques</button>
+                        <button class="btn-cam-preset" data-preset="top">Cenital</button>
+                        <button class="btn-cam-preset" data-preset="bottom">Ventral</button>
                     </div>
 
                     <!-- Botón de Soplado de Emergencia (Aire comprimido a 200 bar) -->
