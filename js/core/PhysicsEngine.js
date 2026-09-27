@@ -43,12 +43,19 @@ export class PhysicsEngine {
     calculateCompressedVolume(depth) {
         if (depth <= 0) return SUBMARINE_CONSTANTS.BASELINE_VOLUME;
 
+        // Si ya ocurrió la implosión, el volumen colapsa al 38%
+        if (this.state.isImploded) {
+            const p = this.state.implosionProgress;
+            const collapseFactor = 0.88 - (0.50 * p); // De 88% a 38%
+            return SUBMARINE_CONSTANTS.BASELINE_VOLUME * collapseFactor;
+        }
+
         const beta = SUBMARINE_CONSTANTS.HULL_COMPRESSIBILITY_BETA * this.state.compressibilityMultiplier;
         const pGauge = this.state.waterDensity * this.state.gravity * depth;
         const volumetricStrain = beta * pGauge; // Deformación volumétrica adimensional
         
         // El volumen disminuye a mayor profundidad: V(h) = V0 * (1 - beta * rho * g * h)
-        return SUBMARINE_CONSTANTS.BASELINE_VOLUME * Math.max(0.70, (1.0 - volumetricStrain));
+        return SUBMARINE_CONSTANTS.BASELINE_VOLUME * Math.max(0.60, (1.0 - volumetricStrain));
     }
 
     /**
@@ -272,25 +279,32 @@ export class PhysicsEngine {
     updateStructuralIntegrity(dt) {
         const depth = Math.max(0, -this.state.y);
 
-        if (depth > SUBMARINE_CONSTANTS.CRUSH_DEPTH) {
-            // Se sobrepasó la profundidad de colapso: la presión supera el límite elástico del acero
+        if (depth >= SUBMARINE_CONSTANTS.CRUSH_DEPTH) {
+            // Se sobrepasó la profundidad de colapso: la presión supera el límite elástico
             const excess = depth - SUBMARINE_CONSTANTS.CRUSH_DEPTH;
-            const decayRate = 15.0 + excess * 1.5; // Pérdida acelerada de integridad
+            const decayRate = 50.0 + excess * 10.0; // Colapso catastrófico en menos de 0.6s
             this.state.structuralIntegrity = Math.max(0.0, this.state.structuralIntegrity - decayRate * dt);
 
             if (this.state.structuralIntegrity <= 0.0 && !this.state.isImploded) {
                 this.state.isImploded = true;
                 this.state.implosionTriggered = true;
-                this.state.emit('implosion');
+                this.state.emit('implosion', { depth, pressure: this.state.hydrostaticPressure });
             }
+        } else if (depth > SUBMARINE_CONSTANTS.TEST_DEPTH) {
+            // Zona de advertencia: fatiga estructural acelerada
+            const fatigue = (depth - SUBMARINE_CONSTANTS.TEST_DEPTH) * 2.5;
+            this.state.structuralIntegrity = Math.max(25.0, this.state.structuralIntegrity - fatigue * dt);
         } else if (depth > SUBMARINE_CONSTANTS.MAX_OPERATING_DEPTH) {
-            // Zona de advertencia: fatiga estructural leve
-            const fatigue = (depth - SUBMARINE_CONSTANTS.MAX_OPERATING_DEPTH) * 0.02;
-            this.state.structuralIntegrity = Math.max(10.0, this.state.structuralIntegrity - fatigue * dt);
+            // Zona operativa límite
+            const fatigue = (depth - SUBMARINE_CONSTANTS.MAX_OPERATING_DEPTH) * 0.8;
+            this.state.structuralIntegrity = Math.max(65.0, this.state.structuralIntegrity - fatigue * dt);
+        } else {
+            // Zona segura: recuperación elástica gradual si asciende
+            this.state.structuralIntegrity = Math.min(100.0, this.state.structuralIntegrity + dt * 10.0);
         }
 
         if (this.state.isImploded) {
-            this.state.implosionProgress = Math.min(1.0, this.state.implosionProgress + dt * 3.0);
+            this.state.implosionProgress = Math.min(1.0, this.state.implosionProgress + dt * 1.6);
         }
     }
 

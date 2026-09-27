@@ -117,6 +117,26 @@ export class HUD {
                 </div>
             </div>
 
+            <!-- TARJETA MODAL DE ALERTA DE IMPLOSIÓN CATASTRÓFICA -->
+            <div id="implosion-alert-card" class="implosion-alert-card" style="display: none;">
+                <div class="implosion-alert-header">
+                    ${Icons.alertTriangle}
+                    <span>COLAPSO ESTRUCTURAL CATASTRÓFICO</span>
+                </div>
+                <div class="implosion-alert-body">
+                    <p>El casco transparente ha superado el límite elástico de compresión hidrostática. Se ha producido una implosión súbita por pandeo inelástico.</p>
+                    <div class="implosion-metrics">
+                        <div><span>Profundidad de colapso:</span> <strong id="implosion-depth-val">35.0 m</strong></div>
+                        <div><span>Presión hidrostática:</span> <strong id="implosion-press-val">4.52 atm</strong></div>
+                        <div><span>Volumen residual:</span> <strong>38.0%</strong></div>
+                    </div>
+                    <button id="btn-implosion-reset" class="btn-emergency-action">
+                        ${Icons.rotateCcw}
+                        <span>Reiniciar Laboratorio</span>
+                    </button>
+                </div>
+            </div>
+
             <!-- PIE DE PÁGINA (Guía de navegación del usuario) -->
             <footer class="interaction-footer">
                 Interactuar: Click Izq (Rotar) | Click Der (Mover) | Rueda (Zoom)
@@ -203,6 +223,9 @@ export class HUD {
 
         const btnResetCard = document.getElementById('btn-hud-reset');
         if (btnResetCard) btnResetCard.addEventListener('click', handleReset);
+
+        const btnResetImp = document.getElementById('btn-implosion-reset');
+        if (btnResetImp) btnResetImp.addEventListener('click', handleReset);
 
         // 7. Slider de Llenado de Tanques (0% a 100%)
         const sliderBallast = document.getElementById('slider-ballast');
@@ -299,21 +322,46 @@ export class HUD {
         const elW = document.getElementById('hud-weight');
         if (elW) elW.textContent = `${(s.weightForce / 1000000).toFixed(2)} MN`;
 
-        // 6. Estado Dinámico Sincronizado (Resuelve la discordancia reportada en 1.1)
+        // 6. Estado Dinámico Sincronizado (Compresión elástica y Colapso)
         const elState = document.getElementById('hud-state-badge');
         if (elState) {
-            const deltaF = s.buoyancyForce - s.weightForce;
-            const threshold = 18000; // 18 kN de tolerancia para estado neutro
-
-            if (Math.abs(deltaF) <= threshold && Math.abs(s.vy) < 0.08) {
-                elState.textContent = 'NEUTRO (E ≈ W)';
-                elState.className = 'state-badge neutral';
-            } else if (deltaF > threshold) {
-                elState.textContent = 'EMERGIENDO (E > W)';
-                elState.className = 'state-badge emerging';
+            if (s.isImploded) {
+                elState.textContent = 'IMPLOSIÓN POR PRESIÓN';
+                elState.className = 'state-badge imploded';
+            } else if (depth >= 28.0) {
+                elState.textContent = 'ESTRÉS CRÍTICO (P > 3.8 atm)';
+                elState.className = 'state-badge critical';
             } else {
-                elState.textContent = 'HUNDIÉNDOSE (E < W)';
-                elState.className = 'state-badge sinking';
+                const deltaF = s.buoyancyForce - s.weightForce;
+                const threshold = 18000; // 18 kN de tolerancia para estado neutro
+
+                if (Math.abs(deltaF) <= threshold && Math.abs(s.vy) < 0.08) {
+                    elState.textContent = 'NEUTRO (E ≈ W)';
+                    elState.className = 'state-badge neutral';
+                } else if (deltaF > threshold) {
+                    elState.textContent = 'EMERGIENDO (E > W)';
+                    elState.className = 'state-badge emerging';
+                } else {
+                    elState.textContent = 'HUNDIÉNDOSE (E < W)';
+                    elState.className = 'state-badge sinking';
+                }
+            }
+        }
+
+        // 7. Tarjeta de Alerta de Implosión Catastrófica
+        const elImplosionCard = document.getElementById('implosion-alert-card');
+        if (elImplosionCard) {
+            if (s.isImploded) {
+                elImplosionCard.style.display = 'block';
+                const elImpDepth = document.getElementById('implosion-depth-val');
+                if (elImpDepth) elImpDepth.textContent = `${depth.toFixed(1)} m`;
+                const elImpPress = document.getElementById('implosion-press-val');
+                if (elImpPress) {
+                    const atm = s.hydrostaticPressure / PHYSICS_CONSTANTS.P_ATM;
+                    elImpPress.textContent = `${atm.toFixed(2)} atm`;
+                }
+            } else {
+                elImplosionCard.style.display = 'none';
             }
         }
 

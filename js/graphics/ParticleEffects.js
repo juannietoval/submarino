@@ -307,5 +307,34 @@ export class ParticleEffects {
             }
         }
         cPos.needsUpdate = true;
+
+        // 4. Pluma de escape de aire residual continuo tras la implosión
+        if (this.state.isImploded && Math.random() < 0.6) {
+            const rx = (Math.random() - 0.5) * 1.2;
+            const rz = (Math.random() - 0.5) * 5.0;
+            this.emitBubble(rx, subY + 0.5, rz, (Math.random() - 0.5) * 0.4, 2.8, (Math.random() - 0.5) * 0.4);
+        }
+    }
+
+    /**
+     * Ráfaga masiva de cavitación y burbujas de aire a alta velocidad por implosión catastrófica
+     */
+    triggerImplosionBurst(subX = 0, subY = -35.0, subZ = 0) {
+        const count = 450;
+        for (let i = 0; i < count; i++) {
+            const theta = Math.random() * Math.PI * 2;
+            const phi = Math.acos((Math.random() * 2) - 1);
+            const speed = 4.0 + Math.random() * 9.5;
+
+            const vx = Math.sin(phi) * Math.cos(theta) * speed;
+            const vy = Math.sin(phi) * Math.sin(theta) * speed + 2.0;
+            const vz = Math.cos(phi) * speed;
+
+            const oz = (Math.random() - 0.5) * 7.5;
+            const ox = (Math.random() - 0.5) * 1.6;
+            const oy = (Math.random() - 0.5) * 1.6;
+
+            this.emitBubble(subX + ox, subY + oy, subZ + oz, vx, vy, vz);
+        }
     }
 }

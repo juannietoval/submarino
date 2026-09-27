@@ -22,11 +22,15 @@ export class SubmarineModel {
         this.rootGroup = new THREE.Group();
         this.hullGroup = new THREE.Group();
         this.internalGroup = new THREE.Group();
+        this.sailGroup = new THREE.Group();
         this.propellerGroup = new THREE.Group();
         this.fairwaterPlanesGroup = new THREE.Group();
         this.vectorsGroup = new THREE.Group();
 
+        this.shockwaveProgress = 1.0;
+
         this.initMaterials();
+        this.initShockwave();
         this.buildSubmarine();
         this.buildForceVectors();
 
@@ -39,6 +43,11 @@ export class SubmarineModel {
         this.rootGroup.add(this.vectorsGroup);
 
         this.scene.add(this.rootGroup);
+
+        // Suscripción al evento de reinicio para restaurar geometría intacta
+        if (this.state && typeof this.state.on === 'function') {
+            this.state.on('reset', () => this.resetVisuals());
+        }
     }
 
     /**
@@ -172,6 +181,76 @@ export class SubmarineModel {
     }
 
     /**
+     * Malla de onda de choque expansiva para la implosión catastrófica
+     */
+    initShockwave() {
+        const shockGeo = new THREE.SphereGeometry(1.0, 32, 24);
+        this.shockwaveMat = new THREE.MeshBasicMaterial({
+            color: 0x66ffff,
+            transparent: true,
+            opacity: 0.0,
+            side: THREE.BackSide,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
+        });
+        this.shockwaveMesh = new THREE.Mesh(shockGeo, this.shockwaveMat);
+        this.shockwaveMesh.visible = false;
+        this.scene.add(this.shockwaveMesh);
+    }
+
+    /**
+     * Disparador del efecto de onda de choque por aplastamiento hidrostático
+     */
+    triggerImplosionEffect() {
+        if (this.shockwaveMesh) {
+            this.shockwaveMesh.position.set(0, this.state.y, 0);
+            this.shockwaveMesh.scale.set(1.0, 1.0, 1.0);
+            this.shockwaveMesh.visible = true;
+            this.shockwaveProgress = 0.0;
+        }
+    }
+
+    /**
+     * Restaura la geometría prístina y propiedades de los materiales tras un reinicio
+     */
+    resetVisuals() {
+        this.implosionT = 0.0;
+        this.shockwaveProgress = 1.0;
+        if (this.mainHull) {
+            this.mainHull.scale.set(1.0, 1.0, 1.0);
+            this.mainHull.position.set(0, 0, 0);
+        }
+        if (this.internalGroup) {
+            this.internalGroup.scale.set(1.0, 1.0, 1.0);
+            this.internalGroup.position.set(0, 0, 0);
+        }
+        if (this.fwdFlange) this.fwdFlange.scale.set(1.0, 1.0, 1.0);
+        if (this.aftFlange) this.aftFlange.scale.set(1.0, 1.0, 1.0);
+        if (this.ventralGroup) {
+            this.ventralGroup.scale.set(1.0, 1.0, 1.0);
+            this.ventralGroup.position.set(0, 0, 0);
+        }
+        if (this.sailGroup) {
+            this.sailGroup.rotation.set(0, 0, 0);
+            this.sailGroup.position.set(0, this.SUB_RADIUS * 0.70, this.hullCylLen * 0.20);
+        }
+        if (this.propellerGroup) {
+            this.propellerGroup.rotation.set(0, 0, 0);
+        }
+        if (this.shockwaveMesh) {
+            this.shockwaveMesh.visible = false;
+        }
+        if (this.hullMat) {
+            this.hullMat.color.setHex(0xd0d8df);
+            this.hullMat.roughness = 0.08;
+            this.hullMat.metalness = 0.25;
+            this.hullMat.transmission = 0.28;
+            this.hullMat.opacity = 0.72;
+            this.hullMat.clearcoat = 1.0;
+        }
+    }
+
+    /**
      * Construcción de la Arquitectura Completa del Submarino
      */
     buildSubmarine() {
@@ -207,13 +286,13 @@ export class SubmarineModel {
 
         // B. Anillos de Brida Reforzada (Juntas estancas entre acrílico y acero)
         const flangeGeo = new THREE.TorusGeometry(R * 1.018, 0.055, 16, 40);
-        const fwdFlange = new THREE.Mesh(flangeGeo, this.detailMat);
-        fwdFlange.position.z = L / 2;
-        this.hullGroup.add(fwdFlange);
+        this.fwdFlange = new THREE.Mesh(flangeGeo, this.detailMat);
+        this.fwdFlange.position.z = L / 2;
+        this.hullGroup.add(this.fwdFlange);
 
-        const aftFlange = new THREE.Mesh(flangeGeo, this.detailMat);
-        aftFlange.position.z = -L / 2;
-        this.hullGroup.add(aftFlange);
+        this.aftFlange = new THREE.Mesh(flangeGeo, this.detailMat);
+        this.aftFlange.position.z = -L / 2;
+        this.hullGroup.add(this.aftFlange);
 
         // C. Proa Hemisférica en Acero Naval (+Z)
         const noseGeo = new THREE.SphereGeometry(R, 40, 20, 0, Math.PI * 2, 0, Math.PI / 2);
@@ -281,13 +360,13 @@ export class SubmarineModel {
      * 2. Quilla Ventral, Tomas de Mar Kingston y Quillas de Balance (Vistas Inferiores)
      */
     buildVentralKeelAndIntakes(R, L) {
-        const ventralGroup = new THREE.Group();
+        this.ventralGroup = new THREE.Group();
 
         // A. Quilla Externa Longitudinal de Protección Naval
         const keelBarGeo = new THREE.BoxGeometry(0.18, 0.10, L * 0.98);
         const keelBar = new THREE.Mesh(keelBarGeo, this.steelDarkMat);
         keelBar.position.set(0, -R - 0.05, 0);
-        ventralGroup.add(keelBar);
+        this.ventralGroup.add(keelBar);
 
         // B. Rejillas de Inundación de Válvulas Kingston (Bajo tanques proel y popel)
         const tankZs = [L * 0.25, -L * 0.25];
@@ -315,7 +394,7 @@ export class SubmarineModel {
                 grateFrameGroup.add(barMesh);
             }
 
-            ventralGroup.add(grateFrameGroup);
+            this.ventralGroup.add(grateFrameGroup);
         }
 
         // C. Quillas de Balance Laterales (Bilge Keels) para amortiguamiento de rolido
@@ -330,23 +409,23 @@ export class SubmarineModel {
         const bkPort = new THREE.Mesh(bkGeo, this.steelDarkMat);
         bkPort.position.set(-R * Math.cos(bkAngle) - 0.06, -R * Math.sin(bkAngle) - 0.06, 0);
         bkPort.rotation.z = -bkAngle;
-        ventralGroup.add(bkPort);
+        this.ventralGroup.add(bkPort);
 
         // Quilla de balance estribor (derecha: +X)
         const bkStarboard = new THREE.Mesh(bkGeo, this.steelDarkMat);
         bkStarboard.position.set(R * Math.cos(bkAngle) + 0.06, -R * Math.sin(bkAngle) - 0.06, 0);
         bkStarboard.rotation.z = bkAngle;
-        ventralGroup.add(bkStarboard);
+        this.ventralGroup.add(bkStarboard);
 
-        this.hullGroup.add(ventralGroup);
+        this.hullGroup.add(this.ventralGroup);
     }
 
     /**
      * 3. Vela Hidrodinámica Albacore y Planos de Inmersión NACA
      */
     buildHydrodynamicSail(R, L) {
-        const sailGroup = new THREE.Group();
-        sailGroup.position.set(0, R * 0.70, L * 0.20);
+        this.sailGroup.clear();
+        this.sailGroup.position.set(0, R * 0.70, L * 0.20);
 
         const sailWidth = R * 0.65;
         const sailLength = R * 1.85;
@@ -378,14 +457,14 @@ export class SubmarineModel {
 
         const sailMesh = new THREE.Mesh(sailGeo, this.steelDarkMat);
         sailMesh.position.y = sailHeight / 2;
-        sailGroup.add(sailMesh);
+        this.sailGroup.add(sailMesh);
 
         // Cúpula superior de observación / puente de mando
         const bridgeGeo = new THREE.SphereGeometry(halfW * 0.90, 16, 12, 0, Math.PI * 2, 0, Math.PI / 2);
         const bridgeMesh = new THREE.Mesh(bridgeGeo, this.detailMat);
         bridgeMesh.position.set(0, sailHeight + 0.04, halfL * 0.25);
         bridgeMesh.scale.set(1.0, 0.45, 1.4);
-        sailGroup.add(bridgeMesh);
+        this.sailGroup.add(bridgeMesh);
 
         // Timones de Inmersión en la Vela con perfil hidroala NACA (Fairwater Planes)
         const planeSpan = 1.35;
@@ -436,7 +515,7 @@ export class SubmarineModel {
         planeShaft.position.set(0, sailHeight * 0.60, 0);
         this.fairwaterPlanesGroup.add(planeShaft);
 
-        sailGroup.add(this.fairwaterPlanesGroup);
+        this.sailGroup.add(this.fairwaterPlanesGroup);
 
         // Mástiles Retráctiles Detallados (Periscopios, radar y snorkel)
         // 1. Periscopio de ataque (esbelto con cabezal óptico y prisma de bronce)
@@ -444,26 +523,26 @@ export class SubmarineModel {
         mast1.position.set(0.14, sailHeight + 0.65, halfL * 0.10);
         const opticHead1 = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.045, 0.18, 16), this.bronzeMat);
         opticHead1.position.set(0.14, sailHeight + 1.28, halfL * 0.10);
-        sailGroup.add(mast1);
-        sailGroup.add(opticHead1);
+        this.sailGroup.add(mast1);
+        this.sailGroup.add(opticHead1);
 
         // 2. Periscopio de búsqueda y satélite con radomo
         const mast2 = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 1.00, 16), this.detailMat);
         mast2.position.set(-0.14, sailHeight + 0.50, -halfL * 0.15);
         const opticHead2 = new THREE.Mesh(new THREE.SphereGeometry(0.075, 12, 10), this.steelDarkMat);
         opticHead2.position.set(-0.14, sailHeight + 0.98, -halfL * 0.15);
-        sailGroup.add(mast2);
-        sailGroup.add(opticHead2);
+        this.sailGroup.add(mast2);
+        this.sailGroup.add(opticHead2);
 
         // 3. Mástil Snorkel de inducción con válvula de flotador
         const mast3 = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.065, 0.75, 16), this.steelDarkMat);
         mast3.position.set(0, sailHeight + 0.36, -halfL * 0.45);
         const snorkelHead = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.065, 0.15, 16), this.detailMat);
         snorkelHead.position.set(0, sailHeight + 0.72, -halfL * 0.45);
-        sailGroup.add(mast3);
-        sailGroup.add(snorkelHead);
+        this.sailGroup.add(mast3);
+        this.sailGroup.add(snorkelHead);
 
-        this.hullGroup.add(sailGroup);
+        this.hullGroup.add(this.sailGroup);
     }
 
     /**
@@ -1029,10 +1108,119 @@ export class SubmarineModel {
         this.rootGroup.rotation.x = -pitchAngle;
         this.rootGroup.updateMatrixWorld(true);
 
-        // Rotación de la hélice propulsora de 7 palas según RPM
-        const rpm = Number.isFinite(this.state.propellerRPM) ? this.state.propellerRPM : 0.0;
-        const rps = rpm / 60.0;
         const deltaT = Number.isFinite(dt) ? dt : 0.016;
+
+        // --- DINÁMICA DE CONTRACCIÓN POR PRESIÓN HIDROSTÁTICA E IMPLOSIÓN ---
+        const depth = Math.max(0, -posY);
+        const depthRatio = Math.min(1.0, depth / 35.0);
+        const elasticComp = 1.0 - (depthRatio * 0.12); // Contracción radial elástica hasta un 12% a 35m
+        const R = this.SUB_RADIUS;
+        const L = this.hullCylLen;
+
+        if (!this.state.isImploded) {
+            // Estado de compresión elástica estructural progresiva
+            let jitterX = 0;
+            let jitterY = 0;
+            if (depth > 28.0) {
+                // Vibración de tensión crítica por esfuerzo estructural previo a la falla
+                const stressFactor = Math.min(1.0, (depth - 28.0) / 7.0);
+                const freq = (this.state.simTime || 0) * 45.0;
+                jitterX = Math.sin(freq) * 0.014 * stressFactor;
+                jitterY = Math.cos(freq * 1.3) * 0.014 * stressFactor;
+            }
+
+            const scaleRadial = elasticComp + jitterX;
+            const scaleVertical = elasticComp + jitterY;
+
+            if (this.mainHull) {
+                // Mantener longitud axial en 1.0 para mantener unión estanca hermética con proa y popa
+                this.mainHull.scale.set(scaleRadial, 1.0, scaleVertical);
+                this.mainHull.position.set(0, 0, 0);
+            }
+            if (this.internalGroup) {
+                this.internalGroup.scale.set(scaleRadial * 0.98, scaleVertical * 0.98, 1.0);
+                this.internalGroup.position.set(0, 0, 0);
+            }
+            if (this.fwdFlange) this.fwdFlange.scale.set(scaleRadial, scaleVertical, 1.0);
+            if (this.aftFlange) this.aftFlange.scale.set(scaleRadial, scaleVertical, 1.0);
+
+            // Ajustar posición vertical de la vela y quilla para seguir la superficie del cilindro elástico
+            if (this.sailGroup) {
+                this.sailGroup.position.set(0, (R * 0.70) * scaleVertical, L * 0.20);
+                this.sailGroup.rotation.set(0, 0, 0);
+            }
+            if (this.ventralGroup) {
+                this.ventralGroup.position.set(0, (1.0 - scaleVertical) * R * 0.92, 0);
+                this.ventralGroup.scale.set(1.0, 1.0, 1.0);
+            }
+            if (this.propellerGroup) {
+                this.propellerGroup.rotation.x = 0;
+            }
+        } else {
+            // Estado de Implosión Catastrófica por Aplastamiento Hidrostático
+            this.implosionT = Math.min(1.0, (this.implosionT || 0) + deltaT * 4.5);
+
+            // Colapso súbito radial del 88% al 40% del diámetro original
+            const collapseRad = THREE.MathUtils.lerp(0.88, 0.40, this.implosionT);
+            const buckleSine = Math.sin(this.implosionT * Math.PI * 3.5) * 0.07 * (1.0 - this.implosionT);
+            const buckleCos = Math.cos(this.implosionT * Math.PI * 3.5) * 0.07 * (1.0 - this.implosionT);
+
+            const crushWidth = (collapseRad * 0.82) + buckleSine;
+            const crushHeight = (collapseRad * 1.18) + buckleCos;
+
+            if (this.mainHull) {
+                // Longitud axial se mantiene en 1.0 sin desconectar los mamparos
+                this.mainHull.scale.set(crushWidth, 1.0, crushHeight);
+                this.mainHull.position.set(buckleSine * 0.15, -0.15 * this.implosionT, 0);
+            }
+            if (this.internalGroup) {
+                this.internalGroup.scale.set(crushWidth * 0.94, crushHeight * 0.94, 1.0);
+                this.internalGroup.position.set(buckleSine * 0.15, -0.15 * this.implosionT, 0);
+            }
+            if (this.fwdFlange) this.fwdFlange.scale.set(crushWidth, crushHeight, 1.0);
+            if (this.aftFlange) this.aftFlange.scale.set(crushWidth, crushHeight, 1.0);
+
+            if (this.sailGroup) {
+                // La vela colapsa sobre el casco comprimido y se tuerce
+                const sailDropY = (R * 0.70) * crushHeight - (0.15 * this.implosionT);
+                this.sailGroup.position.set(buckleSine * 0.1, sailDropY, L * 0.20);
+                this.sailGroup.rotation.z = 0.42 * this.implosionT;
+                this.sailGroup.rotation.x = -0.16 * this.implosionT;
+            }
+            if (this.ventralGroup) {
+                this.ventralGroup.position.set(buckleSine * 0.1, (1.0 - crushHeight) * R * 0.92 - (0.15 * this.implosionT), 0);
+                this.ventralGroup.scale.set(crushWidth, 1.0, 1.0);
+            }
+            if (this.propellerGroup) {
+                // Deformación del eje propulsor por colapso popel
+                this.propellerGroup.rotation.x = 0.30 * this.implosionT;
+            }
+
+            // Degradación y fractura del acrílico marino (crazing, microfisuración y oscurecimiento abisal)
+            if (this.hullMat) {
+                this.hullMat.color.lerp(new THREE.Color(0x22323d), deltaT * 12.0);
+                this.hullMat.roughness = THREE.MathUtils.lerp(this.hullMat.roughness, 0.35, deltaT * 12.0);
+                this.hullMat.transmission = THREE.MathUtils.lerp(this.hullMat.transmission, 0.22, deltaT * 12.0);
+                this.hullMat.opacity = THREE.MathUtils.lerp(this.hullMat.opacity, 0.65, deltaT * 12.0);
+                this.hullMat.clearcoat = THREE.MathUtils.lerp(this.hullMat.clearcoat, 0.30, deltaT * 12.0);
+            }
+        }
+
+        // Expansión de onda de choque expansiva subacuática
+        if (this.shockwaveMesh && this.shockwaveMesh.visible) {
+            this.shockwaveProgress = (this.shockwaveProgress || 0) + deltaT * 2.2;
+            if (this.shockwaveProgress <= 1.0) {
+                const s = 1.0 + Math.pow(this.shockwaveProgress, 0.55) * 35.0;
+                this.shockwaveMesh.scale.set(s, s, s);
+                this.shockwaveMat.opacity = Math.sin(this.shockwaveProgress * Math.PI) * 0.85;
+            } else {
+                this.shockwaveMesh.visible = false;
+            }
+        }
+
+        // Rotación de la hélice propulsora de 7 palas según RPM
+        const rpm = (this.state.isImploded ? 0.0 : (Number.isFinite(this.state.propellerRPM) ? this.state.propellerRPM : 0.0));
+        const rps = rpm / 60.0;
         this.propellerGroup.rotation.z += rps * Math.PI * 2 * deltaT;
 
         // Inclinación hidrodinámica de los timones de inmersión en la vela
@@ -1047,7 +1235,6 @@ export class SubmarineModel {
         const aftFrac = Math.max(0.0, Math.min(1.0, aftRaw / 100.0));
 
         const rEff = this.tankRadius * 0.98;
-        const L = this.hullCylLen;
 
         // Perturbación ondulatoria del menisco durante llenado o soplado activo
         const isAgitated = this.state.isFilling || this.state.isBlowing;
