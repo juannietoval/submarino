@@ -37,9 +37,9 @@ class SubmarineApp {
         this.scene = new THREE.Scene();
 
         const aspect = window.innerWidth / window.innerHeight;
-        this.camera = new THREE.PerspectiveCamera(48, aspect, 0.5, 2000);
-        // Posición isométrica inicial amplia para apreciar el modelo y su cuadrícula
-        this.camera.position.set(-28, 14, 38);
+        this.camera = new THREE.PerspectiveCamera(45, aspect, 0.5, 2000);
+        // Posición isométrica 3/4 para que la proa apunte al frente-derecha (idéntico a la referencia)
+        this.camera.position.set(22, 6.0, -9);
 
         this.renderer = new THREE.WebGLRenderer({
             antialias: true,
@@ -59,8 +59,8 @@ class SubmarineApp {
         this.controls = new OrbitControls(this.camera, this.renderer.domElement);
         this.controls.enableDamping = true;
         this.controls.dampingFactor = 0.05;
-        this.controls.minDistance = 6.0;   // Aproximación cercana a válvulas y mamparos
-        this.controls.maxDistance = 350.0; // Visión lejana de escala oceánica
+        this.controls.minDistance = 5.0;   // Aproximación cercana
+        this.controls.maxDistance = 250.0; // Visión lejana
         this.controls.screenSpacePanning = true; // Paneo libre con clic derecho
         this.controls.target.set(0, 0, 0);
     }
@@ -91,21 +91,20 @@ class SubmarineApp {
     initCameraController() {
         this.cameraController = {
             setPreset: (preset) => {
-                const subX = state.x;
                 const subY = state.y;
 
                 if (preset === 'side') {
-                    // Vista lateral técnica de perfil para comparar vectores E y W
-                    this.targetCamPos = new THREE.Vector3(subX, subY, 44);
-                    this.controls.target.set(subX, subY, 0);
+                    // Vista lateral técnica de perfil
+                    this.targetCamPos = new THREE.Vector3(26, subY, 0);
+                    this.controls.target.set(0, subY, 0);
                 } else if (preset === 'iso') {
-                    // Vista isométrica libre estándar
-                    this.targetCamPos = new THREE.Vector3(subX - 26, subY + 12, 34);
-                    this.controls.target.set(subX, subY, 0);
+                    // Vista isométrica 3/4 de referencia
+                    this.targetCamPos = new THREE.Vector3(22, subY + 6.0, -9);
+                    this.controls.target.set(0, subY, 0);
                 } else if (preset === 'tanks') {
-                    // Primer plano centrado en los tanques de lastre y mamparos
-                    this.targetCamPos = new THREE.Vector3(subX, subY + 1.0, 15);
-                    this.controls.target.set(subX, subY, 0);
+                    // Vista cercana enfocando tanques de lastre
+                    this.targetCamPos = new THREE.Vector3(12, subY + 2.0, 5);
+                    this.controls.target.set(0, subY, 0);
                 }
             }
         };

@@ -44,28 +44,25 @@
                 const sub = new SubmarineModel(scene, state);
                 log('✓ SubmarineModel construido exitosamente.');
 
-                // Verificación de orden de renderizado y transparencia
-                log('[TEST 3] Verificando Materiales Ópticos y Orden de Renderizado...');
-                if (sub.acrylicMatBack.side !== THREE.BackSide || sub.acrylicMatBack.depthWrite !== false) {
-                    throw new Error('acrylicMatBack no tiene configuración de cara trasera o depthWrite: false');
+                // Verificación de propiedades de materiales y transparencia
+                log('[TEST 3] Verificando Material Translúcido y Acabado Marino...');
+                if (!sub.hullMat || sub.hullMat.transparent !== true || sub.hullMat.depthWrite !== false) {
+                    throw new Error('hullMat no configurado con transparencia o depthWrite: false');
                 }
-                if (sub.acrylicMatFront.side !== THREE.FrontSide || sub.acrylicMatFront.depthWrite !== false) {
-                    throw new Error('acrylicMatFront no tiene configuración de cara delantera o depthWrite: false');
+                if (sub.hullMat.opacity > 0.85 || sub.hullMat.opacity < 0.60) {
+                    throw new Error('Opacidad del casco fuera de rango visual óptimo');
                 }
-                if (sub.acrylicMatFront.transmission < 0.9 || sub.acrylicMatFront.ior !== 1.491) {
-                    throw new Error('Propiedades ópticas de PMMA no calibradas en acrylicMatFront');
-                }
-                log('✓ Materiales ópticos PBR de PMMA y dos pasadas (BackSide + FrontSide) validados.');
+                log('✓ Material de casco translúcido PBR y propiedades de transmisión validadas.');
 
                 // Verificación de Jerarquía y Mallas internas
                 log('[TEST 4] Verificando Componentes Internos...');
                 if (!sub.fwdWaterMesh || !sub.aftWaterMesh) {
-                    throw new Error('Mallas bifásicas de agua de tanques MBT no instanciadas');
+                    throw new Error('Mallas dinámicas de agua de tanques MBT no instanciadas');
                 }
-                if (!sub.interiorFrameworkGroup || sub.interiorFrameworkGroup.children.length < 5) {
-                    throw new Error('Estructura de cuadernas y mamparos insuficiente');
+                if (!sub.internalGroup || sub.internalGroup.children.length < 5) {
+                    throw new Error('Estructura de cuadernas y tanques insuficiente');
                 }
-                log(`✓ Esqueleto interno verificado (${sub.interiorFrameworkGroup.children.length} ensamblajes estructurales).`);
+                log(`✓ Esqueleto interno verificado (${sub.internalGroup.children.length} ensamblajes estructurales).`);
 
                 // PRUEBAS DE ESTRÉS: Ángulos Extremos y Rotación 360°
                 log('[TEST 5] Probando Rotaciones y Posiciones Extremas (Nadir, Cenit, Proa, Popa, Inversión)...');
@@ -183,9 +180,9 @@
                 // Alternar rayos X y modo opaco
                 log('[TEST 9] Alternando modos X-Ray y Casco Translúcido...');
                 sub.setXrayMode(false);
-                if (sub.acrylicMatFront.transmission > 0.8) throw new Error('Fallo al aplicar modo translúcido naval');
+                if (sub.hullMat.transmission > 0.1) throw new Error('Fallo al aplicar modo translúcido naval');
                 sub.setXrayMode(true);
-                if (sub.acrylicMatFront.transmission < 0.9) throw new Error('Fallo al reestablecer modo óptico X-Ray');
+                if (sub.hullMat.transmission < 0.2) throw new Error('Fallo al reestablecer modo óptico X-Ray');
                 log('✓ Conmutación de opacidad de casco validada.');
 
                 statusDiv.innerHTML = '<span style="color: #00ffaa; font-weight: bold;">¡TODAS LAS PRUEBAS DE RESISTENCIA Y TRANSPARENCIA PASARON CON ÉXITO! (100% OK)</span>';

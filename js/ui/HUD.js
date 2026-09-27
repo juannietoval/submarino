@@ -38,26 +38,6 @@ export class HUD {
                 <div class="brand-authors">Juan Nieto, Santiago Valencia, Juan Campos, Marlon Buitrago (2025)</div>
             </div>
 
-            <!-- BARRA SUPERIOR DE ACCIONES (Pill buttons discretos con iconos SVG) -->
-            <div class="top-action-bar">
-                <button id="btn-toggle-math" class="action-pill-btn">
-                    ${Icons.math}
-                    <span>Fundamentos EDOs</span>
-                </button>
-                <button id="btn-toggle-xray" class="action-pill-btn active">
-                    ${Icons.xray}
-                    <span>Modo Rayos X</span>
-                </button>
-                <button id="btn-toggle-flashlight" class="action-pill-btn active">
-                    ${Icons.flashlight}
-                    <span>Linterna Dirigible</span>
-                </button>
-                <button id="btn-reset-sim" class="action-pill-btn">
-                    ${Icons.rotateCcw}
-                    <span>Reiniciar</span>
-                </button>
-            </div>
-
             <!-- PANEL SUPERIOR IZQUIERDO: TELEMETRÍA COMPACTA (Línea base original) -->
             <div id="telemetry-card" class="compact-glass-card telemetry-card">
                 <div class="card-header">
@@ -69,11 +49,11 @@ export class HUD {
                 <div id="telemetry-body" class="card-body">
                     <div class="hud-metric-row">
                         <span class="label">Profundidad (h):</span>
-                        <span id="hud-depth" class="value">0.0 m</span>
+                        <span id="hud-depth" class="value">0.2 m</span>
                     </div>
                     <div class="hud-metric-row">
                         <span class="label">Presión Ext:</span>
-                        <span id="hud-pressure" class="value">1.00 atm</span>
+                        <span id="hud-pressure" class="value">1.02 atm</span>
                     </div>
                     <div class="hud-metric-row">
                         <span class="label">Volumen Casco:</span>
@@ -82,14 +62,6 @@ export class HUD {
                     <div class="hud-metric-row">
                         <span class="label">Densidad Sub:</span>
                         <span id="hud-density" class="value">923 kg/m³</span>
-                    </div>
-                    <div class="hud-metric-row">
-                        <span class="label">Empuje (E):</span>
-                        <span id="hud-buoyancy" class="value" style="color: #00ffaa">8.85 MN</span>
-                    </div>
-                    <div class="hud-metric-row">
-                        <span class="label">Peso (W):</span>
-                        <span id="hud-weight" class="value" style="color: #ff6688">7.41 MN</span>
                     </div>
                     <div class="hud-status-row">
                         <span class="label">Estado:</span>
@@ -127,6 +99,12 @@ export class HUD {
                     <button id="btn-hud-emergency" class="btn-emergency-action">
                         ${Icons.alertTriangle}
                         <span>EMERGENCIA (Aire)</span>
+                    </button>
+
+                    <!-- Botón de Fundamentos EDOs -->
+                    <button id="btn-hud-math" class="btn-secondary-action">
+                        ${Icons.math}
+                        <span>Fundamentos EDOs</span>
                     </button>
 
                     <!-- Botón de reinicio dentro del panel -->
@@ -171,7 +149,7 @@ export class HUD {
         }
 
         // 3. Modal de Fundamentos EDOs
-        const btnMath = document.getElementById('btn-toggle-math');
+        const btnMath = document.getElementById('btn-hud-math') || document.getElementById('btn-toggle-math');
         if (btnMath && this.onOpenMathModal) {
             btnMath.addEventListener('click', () => this.onOpenMathModal());
         }

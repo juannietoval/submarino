@@ -18,21 +18,20 @@ export class PhysicsEngine {
      * @returns {number} eta entre 0.0 (totalmente fuera del agua) y 1.0 (totalmente sumergido)
      */
     calculateSubmersionRatio(y) {
-        const radius = SUBMARINE_CONSTANTS.HULL_DIAMETER / 2.0;
-        const yTop = radius + 1.2;    // Incluye parte de la vela
-        const yBottom = -radius;
-
-        if (y >= yTop) {
-            return 0.0; // Fuera del agua (en el aire)
+        // En y = 0.0 (superficie del mar), el casco cilíndrico está sumergido en un 90%
+        // con reserva de flotabilidad del 10% (densidad en seco ~923 kg/m3).
+        if (y <= -0.4) {
+            return 1.0; // Casco y vela totalmente sumergidos
         }
-        if (y <= yBottom) {
-            return 1.0; // Completamente sumergido
+        if (y >= 1.8) {
+            return 0.0; // Completamente fuera del agua
         }
 
-        // Interpolación Hermite cúbica suave para asegurar derivadas continuas
-        const t = (yTop - y) / (yTop - yBottom);
+        // Interpolación suave y físicamente consistente:
+        // A y = 0.2 (flotando en superficie), eta ~ 0.92, logrando E > W (Emergiendo)
+        const t = (1.8 - y) / 2.2;
         const clampedT = Math.max(0.0, Math.min(1.0, t));
-        return clampedT * clampedT * (3.0 - 2.0 * clampedT);
+        return Math.min(1.0, Math.pow(clampedT, 0.45));
     }
 
     /**

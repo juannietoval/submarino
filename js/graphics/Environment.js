@@ -36,58 +36,54 @@ export class Environment {
      * Cuadrícula espacial cian luminiscente (Línea base aprobada en la interfaz)
      */
     buildSpatialCyanGrid() {
-        // Cuadrícula principal en el plano horizontal de referencia
-        const gridSize = 300;
-        const gridDivisions = 30;
+        // Cuadrícula principal en la superficie marina
+        const gridSize = 120;
+        const gridDivisions = 24;
 
-        // Color central cian brillante, líneas secundarias cian tenue
         this.gridHelper = new THREE.GridHelper(
             gridSize,
             gridDivisions,
-            0x00f0ff, // Centro cian vibrante
-            0x005577  // Líneas de malla sutiles
+            0x00ffff, // Línea central cian vibrante
+            0x004444  // Malla cian sutil
         );
-        this.gridHelper.position.y = 0.0; // Nivel de flotación inicial
+        this.gridHelper.position.y = 0.05; // Ligeramente por encima de la superficie para evitar Z-fighting
         this.gridHelper.material.transparent = true;
-        this.gridHelper.material.opacity = 0.35;
+        this.gridHelper.material.opacity = 0.25;
         this.rootGroup.add(this.gridHelper);
 
-        // Cuadrícula secundaria en el lecho marino
+        // Cuadrícula secundaria en el fondo marino
         const bedGrid = new THREE.GridHelper(
             gridSize,
             gridDivisions,
-            0x00a8b5,
-            0x0a2233
+            0x008899,
+            0x061824
         );
         bedGrid.position.y = -ENVIRONMENT_CONSTANTS.SEABED_DEPTH;
         bedGrid.material.transparent = true;
-        bedGrid.material.opacity = 0.22;
+        bedGrid.material.opacity = 0.20;
         this.rootGroup.add(bedGrid);
     }
 
     /**
-     * Superficie marina traslúcida con acabado acuático sutil
+     * Superficie marina traslúcida con acabado acuático brillante
      */
     buildOceanSurface() {
-        const surfaceGeom = new THREE.PlaneGeometry(600, 600, 32, 32);
+        const surfaceGeom = new THREE.PlaneGeometry(1200, 1200);
         surfaceGeom.rotateX(-Math.PI / 2);
 
-        this.surfaceMat = new THREE.MeshPhysicalMaterial({
-            color: 0x003344,
-            emissive: 0x001122,
-            emissiveIntensity: 0.2,
-            roughness: 0.1,
-            metalness: 0.05,
-            transmission: 0.88,
-            ior: 1.333,
+        this.surfaceMat = new THREE.MeshStandardMaterial({
+            color: 0x00ffff,
             transparent: true,
-            opacity: 0.65,
+            opacity: 0.40,
             side: THREE.DoubleSide,
-            depthWrite: false,
+            roughness: 0.05,
+            metalness: 0.20,
+            emissive: 0x004455,
+            emissiveIntensity: 0.22,
         });
 
         this.surfaceMesh = new THREE.Mesh(surfaceGeom, this.surfaceMat);
-        this.surfaceMesh.position.y = ENVIRONMENT_CONSTANTS.SEA_SURFACE_Y;
+        this.surfaceMesh.position.y = 0.0;
         this.rootGroup.add(this.surfaceMesh);
     }
 
