@@ -8,6 +8,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 import { state } from './core/State.js';
+import { SUBMARINE_CONSTANTS } from './config/constants.js';
 import { PhysicsEngine } from './core/PhysicsEngine.js';
 import { SubmarineModel } from './graphics/SubmarineModel.js';
 import { LightingSystem } from './graphics/LightingSystem.js';
@@ -25,6 +26,7 @@ class SubmarineApp {
         this.initModules();
         this.initCameraController();
         this.initUserInteractions();
+        this.applyUrlParameters();
 
         this.animate = this.animate.bind(this);
         requestAnimationFrame(this.animate);
@@ -52,6 +54,7 @@ class SubmarineApp {
         this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
         this.renderer.toneMappingExposure = 1.15;
+        this.renderer.localClippingEnabled = true;
 
         this.container.appendChild(this.renderer.domElement);
 
@@ -131,6 +134,45 @@ class SubmarineApp {
             this.renderer.setSize(w, h);
             this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         });
+    }
+
+    /**
+     * Parámetros de consulta en URL para pruebas de laboratorio y verificación visual
+     */
+    applyUrlParameters() {
+        try {
+            const params = new URLSearchParams(window.location.search);
+            if (params.has('ballast')) {
+                const pct = parseFloat(params.get('ballast'));
+                const fwdMax = SUBMARINE_CONSTANTS.BALLAST_MAX_VOLUME_FWD;
+                const aftMax = SUBMARINE_CONSTANTS.BALLAST_MAX_VOLUME_AFT;
+                state.fwdBallastVolume = fwdMax * (pct / 100.0);
+                state.aftBallastVolume = aftMax * (pct / 100.0);
+                state.updateDerivedValues();
+
+                const slider = document.getElementById('slider-ballast');
+                const readout = document.getElementById('val-ballast-pct');
+                if (slider) slider.value = pct;
+                if (readout) readout.textContent = `${pct}%`;
+            }
+
+            if (params.has('y')) {
+                state.y = parseFloat(params.get('y'));
+                state.updateDerivedValues();
+            }
+
+            if (params.has('blow')) {
+                state.valves.emergencyBlow = true;
+                state.isBlowing = true;
+                state.blowingTimer = 8.0;
+            }
+
+            if (params.has('camera') && this.cameraController) {
+                this.cameraController.setPreset(params.get('camera'));
+            }
+        } catch (err) {
+            console.warn("No se pudieron aplicar parámetros de URL:", err);
+        }
     }
 
     /**

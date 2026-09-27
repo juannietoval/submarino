@@ -98,7 +98,19 @@ export class SubmarineModel {
             side: THREE.DoubleSide,
         });
 
-        // Superficie líquida horizontal
+        // Planos de corte físico para tanques de lastre de proa y popa
+        this.fwdClipPlane = new THREE.Plane(new THREE.Vector3(0, -1, 0), 0);
+        this.aftClipPlane = new THREE.Plane(new THREE.Vector3(0, -1, 0), 0);
+
+        this.fwdWaterMat = this.waterFillMat.clone();
+        this.fwdWaterMat.clippingPlanes = [this.fwdClipPlane];
+        this.fwdWaterMat.clipShadows = true;
+
+        this.aftWaterMat = this.waterFillMat.clone();
+        this.aftWaterMat.clippingPlanes = [this.aftClipPlane];
+        this.aftWaterMat.clipShadows = true;
+
+        // Superficie líquida horizontal (Menisco dinámico)
         this.waterSurfaceMat = new THREE.MeshStandardMaterial({
             color: 0x66e5ff,
             emissive: 0x005577,
@@ -254,29 +266,91 @@ export class SubmarineModel {
         this.internalGroup.add(bhAft2);
 
         // Mallas de volumen de agua viva dentro de los tanques
-        const waterGeo = new THREE.CylinderGeometry(this.tankRadius * 0.98, this.tankRadius * 0.98, this.tankLength * 0.98, 24);
+        const rEff = this.tankRadius * 0.98;
+        const lEff = this.tankLength * 0.98;
+        const waterGeo = new THREE.CylinderGeometry(rEff, rEff, lEff, 32);
 
-        this.fwdWaterMesh = new THREE.Mesh(waterGeo, this.waterFillMat);
+        this.fwdWaterMesh = new THREE.Mesh(waterGeo, this.fwdWaterMat);
         this.fwdWaterMesh.rotation.x = Math.PI / 2;
-        this.fwdWaterMesh.position.z = L * 0.25;
+        this.fwdWaterMesh.position.set(0, 0, L * 0.25);
         this.internalGroup.add(this.fwdWaterMesh);
 
-        this.aftWaterMesh = new THREE.Mesh(waterGeo, this.waterFillMat);
+        this.aftWaterMesh = new THREE.Mesh(waterGeo, this.aftWaterMat);
         this.aftWaterMesh.rotation.x = Math.PI / 2;
-        this.aftWaterMesh.position.z = -L * 0.25;
+        this.aftWaterMesh.position.set(0, 0, -L * 0.25);
         this.internalGroup.add(this.aftWaterMesh);
 
-        // Superficies de nivel líquido horizontales
-        const surfGeo = new THREE.PlaneGeometry(this.tankRadius * 1.85, this.tankLength * 0.96);
+        // Superficies de nivel líquido horizontales (Meniscos dinámicos que tapan el corte físico)
+        const surfGeo = new THREE.PlaneGeometry(rEff * 2.0, lEff, 16, 16);
         surfGeo.rotateX(-Math.PI / 2);
 
-        this.fwdWaterSurface = new THREE.Mesh(surfGeo, this.waterSurfaceMat);
-        this.fwdWaterSurface.position.z = L * 0.25;
+        this.fwdWaterSurface = new THREE.Mesh(surfGeo, this.waterSurfaceMat.clone());
+        this.fwdWaterSurface.position.set(0, 0, L * 0.25);
         this.internalGroup.add(this.fwdWaterSurface);
 
-        this.aftWaterSurface = new THREE.Mesh(surfGeo, this.waterSurfaceMat);
-        this.aftWaterSurface.position.z = -L * 0.25;
+        this.aftWaterSurface = new THREE.Mesh(surfGeo, this.waterSurfaceMat.clone());
+        this.aftWaterSurface.position.set(0, 0, -L * 0.25);
         this.internalGroup.add(this.aftWaterSurface);
+
+        // Partículas de agitación y aeración interna dentro de los tanques
+        this.initInternalTankAeration();
+    }
+
+    /**
+     * Sistema de aeración interna y micro-burbujas dentro de los tanques
+     */
+    initInternalTankAeration() {
+        const count = 140;
+        const geom = new THREE.BufferGeometry();
+        const positions = new Float32Array(count * 3);
+        const offsets = new Float32Array(count * 3);
+
+        const L = this.hullCylLen;
+        const rEff = this.tankRadius * 0.85;
+
+        for (let i = 0; i < count; i++) {
+            const isFwd = i < count / 2;
+            const zCenter = isFwd ? (L * 0.25) : (-L * 0.25);
+
+            const rx = (Math.random() - 0.5) * (rEff * 1.6);
+            const ry = (Math.random() - 0.5) * (rEff * 0.6);
+            const rz = zCenter + (Math.random() - 0.5) * (this.tankLength * 0.85);
+
+            positions[i * 3] = rx;
+            positions[i * 3 + 1] = ry;
+            positions[i * 3 + 2] = rz;
+
+            offsets[i * 3] = rx;
+            offsets[i * 3 + 1] = ry;
+            offsets[i * 3 + 2] = rz;
+        }
+
+        geom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+        const canvas = document.createElement('canvas');
+        canvas.width = 32;
+        canvas.height = 32;
+        const ctx = canvas.getContext('2d');
+        const g = ctx.createRadialGradient(16, 16, 2, 16, 16, 14);
+        g.addColorStop(0, 'rgba(255, 255, 255, 0.95)');
+        g.addColorStop(0.4, 'rgba(100, 235, 255, 0.7)');
+        g.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, 32, 32);
+        const tex = new THREE.CanvasTexture(canvas);
+
+        this.internalAerationMat = new THREE.PointsMaterial({
+            size: 0.20,
+            map: tex,
+            transparent: true,
+            opacity: 0.0,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
+        });
+
+        this.internalAerationPoints = new THREE.Points(geom, this.internalAerationMat);
+        this.internalAerationOffsets = offsets;
+        this.internalGroup.add(this.internalAerationPoints);
     }
 
     /**
@@ -351,9 +425,10 @@ export class SubmarineModel {
         const posY = Number.isFinite(this.state.y) ? this.state.y : -0.2;
         const pitchAngle = Number.isFinite(this.state.pitch) ? this.state.pitch : 0.0;
 
-        // Mantener el submarino centrado en el visor en Z y X
+        // Mantener el submarino centrado en el visor en Z y X y actualizar matrices de transformacion
         this.rootGroup.position.set(0, posY, 0);
         this.rootGroup.rotation.x = -pitchAngle;
+        this.rootGroup.updateMatrixWorld(true);
 
         // Rotación de la hélice según RPM
         const rpm = Number.isFinite(this.state.propellerRPM) ? this.state.propellerRPM : 0.0;
@@ -366,39 +441,105 @@ export class SubmarineModel {
         const planeRad = (diveAngle * Math.PI) / 180.0;
         this.fairwaterPlanesGroup.rotation.x = planeRad;
 
-        // Dinámica de llenado de agua en los tanques
+        // Dinámica de llenado físico de agua en los tanques
         const fwdRaw = Number.isFinite(this.state.fwdBallastPct) ? this.state.fwdBallastPct : 0.0;
         const aftRaw = Number.isFinite(this.state.aftBallastPct) ? this.state.aftBallastPct : 0.0;
-        const fwdFrac = Math.max(0.01, Math.min(1.0, fwdRaw / 100.0));
-        const aftFrac = Math.max(0.01, Math.min(1.0, aftRaw / 100.0));
+        const fwdFrac = Math.max(0.0, Math.min(1.0, fwdRaw / 100.0));
+        const aftFrac = Math.max(0.0, Math.min(1.0, aftRaw / 100.0));
 
-        // Nivel vertical en el tanque
-        const r = this.tankRadius;
+        const rEff = this.tankRadius * 0.98;
+        const L = this.hullCylLen;
+
+        // Perturbación ondulatoria del menisco durante llenado o soplado activo
+        const isAgitated = this.state.isFilling || this.state.isBlowing;
+        const waveJitter = isAgitated ? Math.sin(this.state.simTime * 14.0) * 0.012 : 0.0;
+
+        // --- 1. TANQUE DE PROA (FWD: +Z) ---
         if (this.fwdWaterMesh) {
-            // Longitud de tanque (eje Y local del cilindro rotado) se mantiene al 100%
-            // Radio vertical (eje Z local) y transversal (eje X local) crecen con el llenado
-            const scaleZ = Math.max(0.05, fwdFrac);
-            const scaleX = Math.max(0.20, Math.sqrt(fwdFrac));
-            this.fwdWaterMesh.scale.set(scaleX, 1.0, scaleZ);
-            this.fwdWaterMesh.position.y = -r * 0.45 * (1.0 - scaleZ);
+            if (fwdRaw <= 0.5) {
+                this.fwdWaterMesh.visible = false;
+                this.fwdWaterSurface.visible = false;
+                this.fwdClipPlane.constant = -999999;
+            } else if (fwdRaw >= 99.5) {
+                this.fwdWaterMesh.visible = true;
+                this.fwdWaterSurface.visible = false;
+                this.fwdClipPlane.constant = 999999;
+            } else {
+                this.fwdWaterMesh.visible = true;
+                this.fwdWaterSurface.visible = true;
 
-            // Plano superficial horizontal del agua
-            const surfY = -r * 0.85 + (r * 1.70 * fwdFrac);
-            this.fwdWaterSurface.position.y = surfY;
-            this.fwdWaterSurface.scale.set(scaleX, 1.0, 1.0);
-            this.fwdWaterSurface.visible = fwdRaw > 1.0;
+                // Nivel vertical en el cilindro horizontal: de -rEff (fondo) a +rEff (techo)
+                const yLocal = -rEff + (2.0 * rEff * fwdFrac);
+
+                // Ancho de cuerda transversal segun circulo: x = sqrt(R^2 - y^2)
+                const chordHalf = Math.sqrt(Math.max(0.005, (rEff * rEff) - (yLocal * yLocal)));
+                const scaleX = chordHalf / rEff;
+
+                this.fwdWaterSurface.position.set(0, yLocal + waveJitter, L * 0.25);
+                this.fwdWaterSurface.scale.set(scaleX, 1.0, 1.0);
+                this.fwdWaterSurface.rotation.x = pitchAngle;
+
+                // Transformar posición del menisco a coordenadas de mundo para el plano de corte
+                const localMeniscus = new THREE.Vector3(0, yLocal + waveJitter, L * 0.25);
+                const worldMeniscus = localMeniscus.applyMatrix4(this.internalGroup.matrixWorld);
+
+                this.fwdClipPlane.normal.set(0, -1, 0);
+                this.fwdClipPlane.constant = worldMeniscus.y;
+            }
         }
 
+        // --- 2. TANQUE DE POPA (AFT: -Z) ---
         if (this.aftWaterMesh) {
-            const scaleZ = Math.max(0.05, aftFrac);
-            const scaleX = Math.max(0.20, Math.sqrt(aftFrac));
-            this.aftWaterMesh.scale.set(scaleX, 1.0, scaleZ);
-            this.aftWaterMesh.position.y = -r * 0.45 * (1.0 - scaleZ);
+            if (aftRaw <= 0.5) {
+                this.aftWaterMesh.visible = false;
+                this.aftWaterSurface.visible = false;
+                this.aftClipPlane.constant = -999999;
+            } else if (aftRaw >= 99.5) {
+                this.aftWaterMesh.visible = true;
+                this.aftWaterSurface.visible = false;
+                this.aftClipPlane.constant = 999999;
+            } else {
+                this.aftWaterMesh.visible = true;
+                this.aftWaterSurface.visible = true;
 
-            const surfY = -r * 0.85 + (r * 1.70 * aftFrac);
-            this.aftWaterSurface.position.y = surfY;
-            this.aftWaterSurface.scale.set(scaleX, 1.0, 1.0);
-            this.aftWaterSurface.visible = aftRaw > 1.0;
+                const yLocal = -rEff + (2.0 * rEff * aftFrac);
+                const chordHalf = Math.sqrt(Math.max(0.005, (rEff * rEff) - (yLocal * yLocal)));
+                const scaleX = chordHalf / rEff;
+
+                this.aftWaterSurface.position.set(0, yLocal + waveJitter, -L * 0.25);
+                this.aftWaterSurface.scale.set(scaleX, 1.0, 1.0);
+                this.aftWaterSurface.rotation.x = pitchAngle;
+
+                const localMeniscus = new THREE.Vector3(0, yLocal + waveJitter, -L * 0.25);
+                const worldMeniscus = localMeniscus.applyMatrix4(this.internalGroup.matrixWorld);
+
+                this.aftClipPlane.normal.set(0, -1, 0);
+                this.aftClipPlane.constant = worldMeniscus.y;
+            }
+        }
+
+        // --- 3. AERACIÓN Y BURBUJAS INTERNAS EN LOS TANQUES ---
+        if (this.internalAerationPoints) {
+            const targetOpacity = this.state.isBlowing ? 0.85 : (this.state.isFilling ? 0.45 : 0.0);
+            this.internalAerationMat.opacity += (targetOpacity - this.internalAerationMat.opacity) * Math.min(1.0, deltaT * 5.0);
+
+            if (this.internalAerationMat.opacity > 0.02) {
+                const pos = this.internalAerationPoints.geometry.attributes.position;
+                const off = this.internalAerationOffsets;
+                const time = this.state.simTime * 9.0;
+
+                for (let i = 0; i < pos.count; i++) {
+                    const isFwd = i < pos.count / 2;
+                    const frac = isFwd ? fwdFrac : aftFrac;
+                    const yLevel = -rEff + (2.0 * rEff * frac);
+
+                    const px = off[i * 3] + Math.sin(time + i * 1.3) * 0.06;
+                    const py = yLevel - (Math.abs(Math.sin(time * 0.6 + i * 0.7)) * (rEff * 0.45));
+                    const pz = off[i * 3 + 2] + Math.cos(time + i * 1.3) * 0.06;
+                    pos.setXYZ(i, px, py, pz);
+                }
+                pos.needsUpdate = true;
+            }
         }
 
         // Vectores de fuerza

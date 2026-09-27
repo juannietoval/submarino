@@ -182,8 +182,14 @@ export class HUD {
         });
 
         // 6. Botones de Reinicio
+        let lastSliderPct = 0;
         const handleReset = () => {
             this.state.reset();
+            this.state.isFilling = false;
+            this.state.isBlowing = false;
+            this.state.fillingTimer = 0.0;
+            this.state.blowingTimer = 0.0;
+            lastSliderPct = 0;
             const slider = document.getElementById('slider-ballast');
             if (slider) slider.value = 0;
             const readout = document.getElementById('val-ballast-pct');
@@ -204,6 +210,20 @@ export class HUD {
                 const pct = parseFloat(e.target.value);
                 if (readoutBallast) readoutBallast.textContent = `${pct}%`;
 
+                // Detectar direccion de flujo: llenado (inundacion) vs vaciado (inyeccion de aire)
+                if (pct > lastSliderPct + 0.5) {
+                    this.state.isFilling = true;
+                    this.state.fillingTimer = 1.2;
+                    this.state.isBlowing = false;
+                    this.state.blowingTimer = 0.0;
+                } else if (pct < lastSliderPct - 0.5) {
+                    this.state.isBlowing = true;
+                    this.state.blowingTimer = 1.5;
+                    this.state.isFilling = false;
+                    this.state.fillingTimer = 0.0;
+                }
+                lastSliderPct = pct;
+
                 // Asignar volumen proporcional a tanques de proa y popa
                 const fwdMax = SUBMARINE_CONSTANTS.BALLAST_MAX_VOLUME_FWD;
                 const aftMax = SUBMARINE_CONSTANTS.BALLAST_MAX_VOLUME_AFT;
@@ -213,15 +233,15 @@ export class HUD {
             });
         }
 
-        // 8. Botón Soplado de Emergencia
+        // 8. Botón Soplado de Emergencia (Inyección masiva de aire comprimido)
         const btnEmerg = document.getElementById('btn-hud-emergency');
         if (btnEmerg) {
             btnEmerg.addEventListener('click', () => {
                 this.state.valves.emergencyBlow = true;
-                this.state.fwdBallastVolume = 0;
-                this.state.aftBallastVolume = 0;
-                if (sliderBallast) sliderBallast.value = 0;
-                if (readoutBallast) readoutBallast.textContent = '0%';
+                this.state.isBlowing = true;
+                this.state.blowingTimer = 3.5;
+                this.state.isFilling = false;
+                this.state.fillingTimer = 0.0;
             });
         }
 
@@ -292,6 +312,19 @@ export class HUD {
             } else {
                 elState.textContent = 'HUNDIÉNDOSE (E < W)';
                 elState.className = 'state-badge sinking';
+            }
+        }
+
+        // 7. Sincronización continua del slider durante soplado de emergencia o purga activa
+        if (s.valves.emergencyBlow || s.isBlowing) {
+            const slider = document.getElementById('slider-ballast');
+            const readout = document.getElementById('val-ballast-pct');
+            const currentPct = Math.round(s.totalBallastPct);
+            if (slider && document.activeElement !== slider) {
+                slider.value = currentPct;
+            }
+            if (readout) {
+                readout.textContent = `${currentPct}%`;
             }
         }
     }

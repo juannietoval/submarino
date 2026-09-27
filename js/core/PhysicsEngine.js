@@ -199,6 +199,21 @@ export class PhysicsEngine {
             0.0,
             Math.min(SUBMARINE_CONSTANTS.BALLAST_MAX_VOLUME_AFT, this.state.aftBallastVolume + aftRate * dt)
         );
+
+        // Actualizar temporizadores y estados de animación
+        if (this.state.fillingTimer > 0) {
+            this.state.fillingTimer -= dt;
+            this.state.isFilling = (this.state.fillingTimer > 0);
+        } else {
+            this.state.isFilling = (v.fwdFlood || v.aftFlood);
+        }
+
+        if (this.state.blowingTimer > 0) {
+            this.state.blowingTimer -= dt;
+            this.state.isBlowing = (this.state.blowingTimer > 0) || v.emergencyBlow;
+        } else {
+            this.state.isBlowing = (v.emergencyBlow || v.fwdBlow || v.aftBlow);
+        }
     }
 
     /**

@@ -62,6 +62,12 @@ class SimulationState {
             emergencyBlow: false,
         };
 
+        // Estados de animación física para fluidos de tanques
+        this.isFilling = false;
+        this.fillingTimer = 0.0;
+        this.isBlowing = false;
+        this.blowingTimer = 0.0;
+
         this.throttle = 0.0;       // [-1.0 a 1.0] Acelerador motor
         this.propellerRPM = 0.0;   // RPM actual
         this.divePlanesAngle = 0.0;// Ángulo timones de inmersión en grados [-25 a 25]
@@ -168,9 +174,13 @@ class SimulationState {
         this.valves.aftBlow = false;
         this.valves.emergencyBlow = false;
 
-        // Tanques al 0%
+        // Tanques al 0% y banderas de animación
         this.fwdBallastVolume = 0.0;
         this.aftBallastVolume = 0.0;
+        this.isFilling = false;
+        this.fillingTimer = 0.0;
+        this.isBlowing = false;
+        this.blowingTimer = 0.0;
         
         this.throttle = 0.0;
         this.propellerRPM = 0.0;

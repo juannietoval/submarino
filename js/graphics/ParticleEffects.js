@@ -1,7 +1,9 @@
 /**
  * Laboratorio Virtual de Dinámica Submarina (Física I - UTP)
- * ParticleEffects.js - Efectos de partículas en suspensión y dinámica de fluidos:
- * Nieve marina orgánica, burbujas de purga de lastre, cavitación helicoidal y soplado de emergencia.
+ * ParticleEffects.js - Dinámica de fluidos y partículas físicas:
+ * 1. Nieve marina orgánica en suspensión abisal con deriva marina
+ * 2. Pluma de soplado de aire de alta presión (Expulsión de burbujas en soplado de emergencia)
+ * 3. Vórtices de cavitación en la hélice propulsora
  */
 
 import * as THREE from 'three';
@@ -17,17 +19,17 @@ export class ParticleEffects {
     }
 
     /**
-     * 1. Nieve Marina (Partículas orgánicas en suspensión abisal con deriva)
+     * 1. Nieve Marina (Partículas orgánicas en suspensión abisal)
      */
     initMarineSnow() {
-        const count = 2000;
+        const count = 1800;
         const geom = new THREE.BufferGeometry();
         const positions = new Float32Array(count * 3);
         const velocities = new Float32Array(count * 3);
 
-        const rangeX = 160;
-        const rangeY = 120;
-        const rangeZ = 160;
+        const rangeX = 140;
+        const rangeY = 100;
+        const rangeZ = 140;
 
         for (let i = 0; i < count; i++) {
             const i3 = i * 3;
@@ -35,19 +37,19 @@ export class ParticleEffects {
             positions[i3 + 1] = (Math.random() - 0.5) * rangeY;
             positions[i3 + 2] = (Math.random() - 0.5) * rangeZ;
 
-            velocities[i3] = (Math.random() - 0.5) * 0.12;
-            velocities[i3 + 1] = -0.04 - Math.random() * 0.08;
-            velocities[i3 + 2] = (Math.random() - 0.5) * 0.12;
+            velocities[i3] = (Math.random() - 0.5) * 0.08;
+            velocities[i3 + 1] = -0.03 - Math.random() * 0.05;
+            velocities[i3 + 2] = (Math.random() - 0.5) * 0.08;
         }
 
         geom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
 
         const tex = this.createCircleTexture(0.85, 0.95, 1.0);
         const mat = new THREE.PointsMaterial({
-            size: 0.35,
+            size: 0.32,
             map: tex,
             transparent: true,
-            opacity: 0.4,
+            opacity: 0.35,
             blending: THREE.AdditiveBlending,
             depthWrite: false,
         });
@@ -59,28 +61,30 @@ export class ParticleEffects {
     }
 
     /**
-     * 2. Burbujas de venteo de tanques de lastre y soplado de aire
+     * 2. Pluma de Burbujas de Alta Presión (Purga y Soplado de Lastre)
      */
     initBallastBubbles() {
-        this.maxBubbles = 1200;
+        this.maxBubbles = 2400;
         const geom = new THREE.BufferGeometry();
         const positions = new Float32Array(this.maxBubbles * 3);
         const velocities = new Float32Array(this.maxBubbles * 3);
+        const scales = new Float32Array(this.maxBubbles);
         const lifetimes = new Float32Array(this.maxBubbles);
 
         for (let i = 0; i < this.maxBubbles; i++) {
             positions[i * 3 + 1] = -9999;
             lifetimes[i] = 0;
+            scales[i] = 1.0;
         }
 
         geom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
 
-        const tex = this.createCircleTexture(0.7, 0.9, 1.0);
+        const tex = this.createCircleTexture(0.75, 0.92, 1.0);
         const mat = new THREE.PointsMaterial({
-            size: 0.45,
+            size: 0.48,
             map: tex,
             transparent: true,
-            opacity: 0.7,
+            opacity: 0.85,
             blending: THREE.AdditiveBlending,
             depthWrite: false,
         });
@@ -88,12 +92,13 @@ export class ParticleEffects {
         this.bubblePoints = new THREE.Points(geom, mat);
         this.bubbleVelocities = velocities;
         this.bubbleLifetimes = lifetimes;
+        this.bubbleScales = scales;
         this.bubbleCursor = 0;
         this.scene.add(this.bubblePoints);
     }
 
     /**
-     * 3. Vórtices de cavitación en la hélice de 7 palas
+     * 3. Vórtices de cavitación en la hélice propulsora
      */
     initCavitationTrails() {
         this.maxCav = 600;
@@ -111,7 +116,7 @@ export class ParticleEffects {
 
         const tex = this.createCircleTexture(0.5, 0.85, 1.0);
         const mat = new THREE.PointsMaterial({
-            size: 0.32,
+            size: 0.30,
             map: tex,
             transparent: true,
             opacity: 0.55,
@@ -132,9 +137,10 @@ export class ParticleEffects {
         canvas.height = 64;
         const ctx = canvas.getContext('2d');
 
-        const grad = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
-        grad.addColorStop(0.0, `rgba(${Math.floor(r * 255)}, ${Math.floor(g * 255)}, ${Math.floor(b * 255)}, 1.0)`);
-        grad.addColorStop(0.5, `rgba(${Math.floor(r * 200)}, ${Math.floor(g * 220)}, 255, 0.45)`);
+        const grad = ctx.createRadialGradient(32, 32, 2, 32, 32, 30);
+        grad.addColorStop(0.0, `rgba(255, 255, 255, 1.0)`);
+        grad.addColorStop(0.35, `rgba(${Math.floor(r * 255)}, ${Math.floor(g * 255)}, ${Math.floor(b * 255)}, 0.85)`);
+        grad.addColorStop(0.70, `rgba(${Math.floor(r * 180)}, ${Math.floor(g * 220)}, 255, 0.40)`);
         grad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');
 
         ctx.fillStyle = grad;
@@ -151,9 +157,9 @@ export class ParticleEffects {
         pos.setXYZ(i, x, y, z);
 
         const i3 = i * 3;
-        this.bubbleVelocities[i3] = vx + (Math.random() - 0.5) * 0.3;
-        this.bubbleVelocities[i3 + 1] = vy + Math.random() * 1.5;
-        this.bubbleVelocities[i3 + 2] = vz + (Math.random() - 0.5) * 0.3;
+        this.bubbleVelocities[i3] = vx + (Math.random() - 0.5) * 0.4;
+        this.bubbleVelocities[i3 + 1] = vy + Math.random() * 1.2;
+        this.bubbleVelocities[i3 + 2] = vz + (Math.random() - 0.5) * 0.4;
         this.bubbleLifetimes[i] = 1.0;
     }
 
@@ -172,8 +178,7 @@ export class ParticleEffects {
     }
 
     update(dt) {
-        const subX = this.state.x;
-        const subY = this.state.y;
+        const subY = Number.isFinite(this.state.y) ? this.state.y : 0.0;
 
         // 1. Nieve Marina
         const snowPos = this.snowPoints.geometry.attributes.position;
@@ -187,8 +192,8 @@ export class ParticleEffects {
             let py = snowPos.getY(i) + this.snowVelocities[i3 + 1] * dt * 2.0;
             let pz = snowPos.getZ(i) + this.snowVelocities[i3 + 2] * dt * 2.0;
 
-            if (px < subX - rX / 2) px += rX;
-            if (px > subX + rX / 2) px -= rX;
+            if (px < -rX / 2) px += rX;
+            if (px > rX / 2) px -= rX;
             if (py < subY - rY / 2) py += rY;
             if (py > subY + rY / 2) py -= rY;
             if (pz < -rZ / 2) pz += rZ;
@@ -198,49 +203,94 @@ export class ParticleEffects {
         }
         snowPos.needsUpdate = true;
 
-        // 2. Generación de burbujas según estado de válvulas y soplado
+        // 2. Generación Física de Burbujas de Purga y Soplado de Lastre (Aire Comprimido)
         const v = this.state.valves;
-        if ((v.fwdFlood || v.aftFlood) && Math.random() < 0.7) {
-            if (v.fwdFlood) this.emitBubble(subX + 3.0, subY + 2.5, (Math.random() - 0.5) * 1.5, -0.3, 2.4, 0);
-            if (v.aftFlood) this.emitBubble(subX - 3.0, subY + 2.5, (Math.random() - 0.5) * 1.5, -0.3, 2.4, 0);
-        }
+        const isBlowing = v.emergencyBlow || v.fwdBlow || v.aftBlow || this.state.isBlowing;
+        const isFilling = this.state.isFilling;
+        const pitch = Number.isFinite(this.state.pitch) ? this.state.pitch : 0.0;
+        const cosP = Math.cos(pitch);
+        const sinP = Math.sin(pitch);
 
-        if (v.emergencyBlow || v.fwdBlow || v.aftBlow) {
-            const count = v.emergencyBlow ? 5 : 2;
-            for (let k = 0; k < count; k++) {
-                this.emitBubble(subX + (Math.random() - 0.5) * 7.0, subY - 2.2, (Math.random() - 0.5) * 2.0, -0.5, 3.2, 0);
+        // A. Soplado de Aire Comprimido (Expulsión violenta de agua por toberas de inundación de quilla)
+        if (isBlowing) {
+            // Emisión de alto caudal: 20 paquetes en emergencia, 6 en soplado estándar
+            const bubbleBatches = v.emergencyBlow ? 20 : 6;
+
+            for (let k = 0; k < bubbleBatches; k++) {
+                // Toberas de Tanque de Proa (alrededor de Z local = +2.38 m)
+                const fwdLocalZ = 2.38 + (Math.random() - 0.5) * 1.6;
+                const fwdX = (Math.random() - 0.5) * 1.2;
+                const fwdY = subY - (1.45 * cosP) + (fwdLocalZ * sinP);
+                const fwdZ = (fwdLocalZ * cosP) + (1.45 * sinP);
+
+                // Chorro descendente inicial expulsado a alta presion que luego asciende por boyancia
+                const blastVx = (Math.random() - 0.5) * 1.6;
+                const blastVy = -0.5 - Math.random() * 1.2; // Sale hacia abajo
+                const blastVz = (Math.random() - 0.5) * 1.2;
+                this.emitBubble(fwdX, fwdY, fwdZ, blastVx, blastVy, blastVz);
+
+                // Toberas de Tanque de Popa (alrededor de Z local = -2.38 m)
+                const aftLocalZ = -2.38 + (Math.random() - 0.5) * 1.6;
+                const aftX = (Math.random() - 0.5) * 1.2;
+                const aftY = subY - (1.45 * cosP) + (aftLocalZ * sinP);
+                const aftZ = (aftLocalZ * cosP) + (1.45 * sinP);
+                this.emitBubble(aftX, aftY, aftZ, blastVx, blastVy, blastVz);
+
+                // Chorro de escape lateral de aire en sobrepresión
+                if (Math.random() < 0.35) {
+                    const sideX = (Math.random() > 0.5 ? 1.4 : -1.4);
+                    const ventY = subY + (0.2 * cosP);
+                    this.emitBubble(sideX, ventY, fwdZ, sideX * 1.2, 1.5, 0);
+                    this.emitBubble(sideX, ventY, aftZ, sideX * 1.2, 1.5, 0);
+                }
             }
+        } else if (isFilling && Math.random() < 0.6) {
+            // Venteo de aire en la parte superior del casco cuando el agua inunda los tanques
+            const topY = subY + (1.45 * cosP);
+            const sideX = (Math.random() > 0.5 ? 0.35 : -0.35);
+            const fwdZ = 2.38 + (Math.random() - 0.5) * 1.2;
+            const aftZ = -2.38 + (Math.random() - 0.5) * 1.2;
+            this.emitBubble(sideX, topY, fwdZ, sideX * 0.2, 2.0, 0);
+            this.emitBubble(sideX, topY, aftZ, sideX * 0.2, 2.0, 0);
         }
 
-        // Actualizar burbujas activas
+        // Actualizar dinámica de ascenso boyante de las burbujas
         const bPos = this.bubblePoints.geometry.attributes.position;
         for (let i = 0; i < this.maxBubbles; i++) {
             if (this.bubbleLifetimes[i] > 0) {
                 const i3 = i * 3;
+                // Aceleración vertical por empuje boyante de Arquímedes sobre el aire
+                this.bubbleVelocities[i3 + 1] += 3.8 * dt;
+                // Deriva turbulenta y dispersión convectiva
+                this.bubbleVelocities[i3] += (Math.random() - 0.5) * 0.35;
+                this.bubbleVelocities[i3 + 2] += (Math.random() - 0.5) * 0.35;
+
                 let px = bPos.getX(i) + this.bubbleVelocities[i3] * dt;
                 let py = bPos.getY(i) + this.bubbleVelocities[i3 + 1] * dt;
                 let pz = bPos.getZ(i) + this.bubbleVelocities[i3 + 2] * dt;
 
+                // Las burbujas se desvanecen y revientan al llegar a la superficie marina (y = 0.0)
                 if (py >= 0.0) {
                     this.bubbleLifetimes[i] = 0;
                     py = -9999;
                 } else {
-                    this.bubbleLifetimes[i] -= dt * 0.4;
+                    this.bubbleLifetimes[i] -= dt * 0.28;
+                    if (this.bubbleLifetimes[i] <= 0) py = -9999;
                 }
                 bPos.setXYZ(i, px, py, pz);
             }
         }
         bPos.needsUpdate = true;
 
-        // 3. Cavitación de la hélice
+        // 3. Cavitación de la hélice propulsora (en la popa del submarino Z = -6.6)
         const rpm = Math.abs(this.state.propellerRPM);
-        if (rpm > 30.0 && Math.random() < 0.6) {
-            const propX = subX - 21.0;
+        if (rpm > 30.0 && Math.random() < 0.65) {
+            const propZ = -6.6; // En el extremo de popa (-Z)
             const cavAngle = Math.random() * Math.PI * 2;
-            const tipY = subY + Math.sin(cavAngle) * 2.0;
-            const tipZ = Math.cos(cavAngle) * 2.0;
-            const slipVx = -Math.sign(this.state.propellerRPM) * (rpm / 60.0) * 8.0;
-            this.emitCavitation(propX, tipY, tipZ, slipVx, 0.3, 0);
+            const tipX = Math.cos(cavAngle) * 0.65;
+            const tipY = subY + Math.sin(cavAngle) * 0.65;
+            const slipVz = Math.sign(this.state.propellerRPM) * (rpm / 60.0) * 4.0;
+            this.emitCavitation(tipX, tipY, propZ, 0, 0.4, slipVz);
         }
 
         const cPos = this.cavPoints.geometry.attributes.position;
@@ -251,7 +301,7 @@ export class ParticleEffects {
                 let py = cPos.getY(i) + this.cavVelocities[i3 + 1] * dt;
                 let pz = cPos.getZ(i) + this.cavVelocities[i3 + 2] * dt;
 
-                this.cavLifetimes[i] -= dt * 1.3;
+                this.cavLifetimes[i] -= dt * 1.5;
                 if (this.cavLifetimes[i] <= 0) py = -9999;
                 cPos.setXYZ(i, px, py, pz);
             }
