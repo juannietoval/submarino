@@ -105,8 +105,8 @@ class SubmarineApp {
                     this.targetCamPos = new THREE.Vector3(22, subY + 6.0, -9);
                     this.controls.target.set(0, subY, 0);
                 } else if (preset === 'tanks') {
-                    // Vista cercana enfocando tanques de lastre
-                    this.targetCamPos = new THREE.Vector3(12, subY + 2.0, 5);
+                    // Vista cercana perpendicular enfocando ambos tanques y sala central
+                    this.targetCamPos = new THREE.Vector3(14, subY + 1.2, 0);
                     this.controls.target.set(0, subY, 0);
                 } else if (preset === 'top') {
                     // Vista superior dorsal (planta)
@@ -121,8 +121,16 @@ class SubmarineApp {
                     this.targetCamPos = new THREE.Vector3(0, subY + 1.2, 22.0);
                     this.controls.target.set(0, subY, 0);
                 } else if (preset === 'interior') {
-                    // Vista cercana interior de tanques y mamparos
-                    this.targetCamPos = new THREE.Vector3(7.5, subY + 1.0, 1.5);
+                    // Vista cercana interior de tanques y mamparos a través del portal
+                    this.targetCamPos = new THREE.Vector3(6.0, subY + 0.6, 0.5);
+                    this.controls.target.set(0, subY, 0);
+                } else if (preset === 'bottom') {
+                    // Vista inferior ventral directa (quilla, tomas Kingston)
+                    this.targetCamPos = new THREE.Vector3(0.01, subY - 24.0, 0);
+                    this.controls.target.set(0, subY, 0);
+                } else if (preset === 'bottom_iso') {
+                    // Vista isométrica inferior 3/4 desde abajo
+                    this.targetCamPos = new THREE.Vector3(18, subY - 12.0, -10);
                     this.controls.target.set(0, subY, 0);
                 }
             }
