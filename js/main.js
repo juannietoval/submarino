@@ -86,6 +86,16 @@ class SubmarineApp {
             this.cameraController,
             () => this.mathModal.toggle()
         );
+
+        // Escuchar evento de implosión para disparar efectos de choque y ráfaga de burbujas
+        state.on('implosion', (data) => {
+            if (this.particleEffects) {
+                this.particleEffects.triggerImplosionBurst(state.x, state.y, 0);
+            }
+            if (this.submarineModel) {
+                this.submarineModel.triggerImplosionEffect();
+            }
+        });
     }
 
     /**
@@ -191,6 +201,16 @@ class SubmarineApp {
                 state.blowingTimer = 8.0;
             }
 
+            if (params.has('imploded')) {
+                state.isImploded = true;
+                state.structuralIntegrity = 0;
+                if (!params.has('y')) {
+                    state.y = -36.0;
+                }
+                state.updateDerivedValues();
+                state.emit('implosion', { depth: Math.max(0, -state.y), pressure: state.hydrostaticPressure });
+            }
+
             if (params.has('camX')) {
                 const cx = parseFloat(params.get('camX'));
                 const cy = parseFloat(params.get('camY') ?? (state.y + 1));
@@ -238,8 +258,10 @@ class SubmarineApp {
                 this.targetCamPos = null;
             }
         } else {
-            // Seguir verticalmente al submarino de manera suave en OrbitControls
-            this.controls.target.y += (state.y - this.controls.target.y) * 0.06;
+            // Seguir verticalmente al submarino manteniendo el encuadre relativo constante
+            const deltaY = state.y - this.controls.target.y;
+            this.controls.target.y += deltaY * 0.15;
+            this.camera.position.y += deltaY * 0.15;
         }
 
         this.controls.update();

@@ -121,17 +121,17 @@ export class Environment {
      */
     update(cameraY, subY) {
         const depth = Math.max(0, -subY);
-        const k = PHYSICS_CONSTANTS.LIGHT_EXTINCTION_K;
+        const k = 0.022;
         const ratio = Math.exp(-k * depth);
 
         // De azul petróleo (#1b2631) a abismo oscuro (#050a10)
-        const r = Math.max(0.02, 0.106 * ratio);
-        const g = Math.max(0.04, 0.149 * ratio);
-        const b = Math.max(0.06, 0.192 * ratio);
+        const r = Math.max(0.015, 0.106 * ratio);
+        const g = Math.max(0.035, 0.149 * ratio);
+        const b = Math.max(0.055, 0.192 * ratio);
 
         if (this.scene.fog) {
             this.scene.fog.color.setRGB(r, g, b);
-            this.scene.fog.density = 0.0055 + (depth / 400.0) * 0.0035;
+            this.scene.fog.density = 0.0055 + (depth / 50.0) * 0.008;
         }
 
         this.scene.background.setRGB(r, g, b);

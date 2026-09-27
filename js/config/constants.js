@@ -55,13 +55,13 @@ export const SUBMARINE_CONSTANTS = {
 
     // Compresibilidad estructural del casco de presión (Ley de Hooke volumétrica)
     // delta_V / V0 = -BETA * rho * g * h
-    // Coeficiente elástico de deformación volumétrica del casco de acero aleado HY-80/HY-100 (Pa^-1)
-    HULL_COMPRESSIBILITY_BETA: 2.2e-8, // Produce ~0.5% - 1.5% de pérdida volumétrica en profundidad
+    // Coeficiente elástico calibrado para visualización didáctica y respuesta física inmediata
+    HULL_COMPRESSIBILITY_BETA: 3.5e-7, // Produce ~3% de contracción a 15m, ~7% a 25m y ~12% a 35m
     
-    // Límites operativos y de colapso estructural (Profundidad en metros)
-    MAX_OPERATING_DEPTH: 280.0,  // Cota máxima de inmersión segura (m)
-    TEST_DEPTH: 350.0,           // Profundidad de prueba de astillero (m)
-    CRUSH_DEPTH: 440.0,          // Profundidad crítica de implosión por presión hidrostática (m)
+    // Límites operativos y de colapso estructural accesibles para experimentación pedagógica
+    MAX_OPERATING_DEPTH: 20.0,  // Cota máxima de inmersión normal (m)
+    TEST_DEPTH: 28.0,           // Cota de advertencia y fatiga elástica (m)
+    CRUSH_DEPTH: 35.0,          // Profundidad crítica de implosión por presión hidrostática (m)
     
     // Parámetros de propulsión
     MAX_PROPELLER_RPM: 240.0,
@@ -70,7 +70,7 @@ export const SUBMARINE_CONSTANTS = {
 
 export const ENVIRONMENT_CONSTANTS = {
     SEA_SURFACE_Y: 0.0,          // Nivel del mar en el sistema de coordenadas
-    SEABED_DEPTH: 380.0,         // Fondo marino (profundidad en metros, y = -380 m)
-    SEABED_SPRING_K: 450000.0,   // Rigidez elástica del lecho marino para colisión suave (N/m)
-    SEABED_DAMPING_C: 220000.0,  // Amortiguamiento viscoso del sedimento (N*s/m)
+    SEABED_DEPTH: 48.0,          // Fondo marino accesible (profundidad en metros, y = -48 m)
+    SEABED_SPRING_K: 5500000.0,  // Rigidez elástica del lecho marino para asentamiento firme (N/m)
+    SEABED_DAMPING_C: 950000.0,  // Amortiguamiento viscoso del sedimento oceánico (N*s/m)
 };
