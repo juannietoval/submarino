@@ -1,6 +1,7 @@
 /**
- * Laboratorio Virtual de Ingeniería y Física: Mecanismo de Hundimiento de un Submarino
- * main.js - Ciclo de vida principal, render loop de Three.js, controlador de cámaras y orquestación
+ * Laboratorio Virtual de Dinámica Submarina (Física I - UTP)
+ * main.js - Orquestador maestro del ciclo de vida, render loop de Three.js,
+ * OrbitControls fluido sin bloqueos y controlador de iluminación dual interactiva.
  */
 
 import * as THREE from 'three';
@@ -9,13 +10,13 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { state } from './core/State.js';
 import { PhysicsEngine } from './core/PhysicsEngine.js';
 import { SubmarineModel } from './graphics/SubmarineModel.js';
+import { LightingSystem } from './graphics/LightingSystem.js';
 import { Environment } from './graphics/Environment.js';
-import { ParticleSystems } from './graphics/ParticleSystems.js';
-import { TelemetryDashboard } from './ui/TelemetryDashboard.js';
-import { MathPanel } from './ui/MathPanel.js';
-import { Controls } from './ui/Controls.js';
+import { ParticleEffects } from './graphics/ParticleEffects.js';
+import { HUD } from './ui/HUD.js';
+import { MathModal } from './ui/MathModal.js';
 
-class SubmarineSimulatorApp {
+class SubmarineApp {
     constructor() {
         this.container = document.getElementById('canvas-container');
         this.clock = new THREE.Clock();
@@ -23,25 +24,23 @@ class SubmarineSimulatorApp {
         this.initThree();
         this.initModules();
         this.initCameraController();
-        this.initEvents();
+        this.initUserInteractions();
 
         this.animate = this.animate.bind(this);
         requestAnimationFrame(this.animate);
     }
 
     /**
-     * Configuración del motor gráfico Three.js (WebGLRenderer con PBR y Tone Mapping)
+     * Motor Gráfico Three.js con WebGL, sombras y mapeo tonal ACESFilmic
      */
     initThree() {
-        // Escena
         this.scene = new THREE.Scene();
 
-        // Cámara de perspectiva
         const aspect = window.innerWidth / window.innerHeight;
-        this.camera = new THREE.PerspectiveCamera(50, aspect, 0.5, 2000);
-        this.camera.position.set(-25, 6, 32);
+        this.camera = new THREE.PerspectiveCamera(48, aspect, 0.5, 2000);
+        // Posición isométrica inicial amplia para apreciar el modelo y su cuadrícula
+        this.camera.position.set(-28, 14, 38);
 
-        // Renderizador WebGL de alta fidelidad
         this.renderer = new THREE.WebGLRenderer({
             antialias: true,
             powerPreference: 'high-performance',
@@ -56,53 +55,75 @@ class SubmarineSimulatorApp {
 
         this.container.appendChild(this.renderer.domElement);
 
-        // Controles de órbita base
-        this.orbitControls = new OrbitControls(this.camera, this.renderer.domElement);
-        this.orbitControls.enableDamping = true;
-        this.orbitControls.dampingFactor = 0.06;
-        this.orbitControls.maxDistance = 500;
-        this.orbitControls.minDistance = 6;
+        // OrbitControls con manipulación 3D absoluta y suave amortiguación inercial
+        this.controls = new OrbitControls(this.camera, this.renderer.domElement);
+        this.controls.enableDamping = true;
+        this.controls.dampingFactor = 0.05;
+        this.controls.minDistance = 6.0;   // Aproximación cercana a válvulas y mamparos
+        this.controls.maxDistance = 350.0; // Visión lejana de escala oceánica
+        this.controls.screenSpacePanning = true; // Paneo libre con clic derecho
+        this.controls.target.set(0, 0, 0);
     }
 
     /**
-     * Instanciación de subsistemas desacoplados
+     * Instancia de todos los módulos del sistema
      */
     initModules() {
         this.physicsEngine = new PhysicsEngine(state);
         this.environment = new Environment(this.scene, state);
+        this.lightingSystem = new LightingSystem(this.scene, state);
         this.submarineModel = new SubmarineModel(this.scene, state);
-        this.particleSystems = new ParticleSystems(this.scene, state);
-        this.telemetryDashboard = new TelemetryDashboard(state);
-        this.mathPanel = new MathPanel(state);
+        this.particleEffects = new ParticleEffects(this.scene, state);
+        this.mathModal = new MathModal(state);
+
+        this.hud = new HUD(
+            state,
+            this.submarineModel,
+            this.lightingSystem,
+            this.cameraController,
+            () => this.mathModal.toggle()
+        );
     }
 
     /**
-     * Controlador de cámaras con múltiples modos dinámicos
+     * Presets cinematográficos de cámara para alternar vistas técnicas
      */
     initCameraController() {
-        this.camMode = 'chase'; // 'chase', 'orbit', 'cutaway', 'sonar'
-
         this.cameraController = {
-            setMode: (mode) => {
-                this.camMode = mode;
-                state.viewMode = mode;
-                if (mode === 'orbit') {
-                    this.orbitControls.enabled = true;
-                    this.orbitControls.target.set(state.x, state.y, 0);
-                } else {
-                    this.orbitControls.enabled = false;
+            setPreset: (preset) => {
+                const subX = state.x;
+                const subY = state.y;
+
+                if (preset === 'side') {
+                    // Vista lateral técnica de perfil para comparar vectores E y W
+                    this.targetCamPos = new THREE.Vector3(subX, subY, 44);
+                    this.controls.target.set(subX, subY, 0);
+                } else if (preset === 'iso') {
+                    // Vista isométrica libre estándar
+                    this.targetCamPos = new THREE.Vector3(subX - 26, subY + 12, 34);
+                    this.controls.target.set(subX, subY, 0);
+                } else if (preset === 'tanks') {
+                    // Primer plano centrado en los tanques de lastre y mamparos
+                    this.targetCamPos = new THREE.Vector3(subX, subY + 1.0, 15);
+                    this.controls.target.set(subX, subY, 0);
                 }
             }
         };
 
-        // Instanciar controles de UI
-        this.controls = new Controls(state, this.submarineModel, this.cameraController);
+        // Asignar controlador a la UI
+        this.hud.cameraController = this.cameraController;
     }
 
     /**
-     * Gestión de redimensionamiento de ventana
+     * Interacciones de usuario y foco dirigible con Raycaster
      */
-    initEvents() {
+    initUserInteractions() {
+        // Movimiento de linterna móvil con el ratón
+        window.addEventListener('mousemove', (e) => {
+            this.lightingSystem.onMouseMove(e, this.camera, this.submarineModel.rootGroup);
+        });
+
+        // Redimensionamiento responsive
         window.addEventListener('resize', () => {
             const w = window.innerWidth;
             const h = window.innerHeight;
@@ -114,57 +135,40 @@ class SubmarineSimulatorApp {
     }
 
     /**
-     * Actualiza la posición y orientación de la cámara según el modo seleccionado
-     */
-    updateCamera(dt) {
-        const subX = state.x;
-        const subY = state.y;
-
-        if (this.camMode === 'chase') {
-            // Cámara de seguimiento suave en 3ra persona con anticipación
-            const targetCamPos = new THREE.Vector3(subX - 28, subY + 6.5, 26);
-            this.camera.position.lerp(targetCamPos, dt * 3.5);
-            this.camera.lookAt(subX + 4, subY, 0);
-        } else if (this.camMode === 'cutaway') {
-            // Primer plano transversal lateral centrado en los tanques de lastre
-            const targetCamPos = new THREE.Vector3(subX, subY + 0.5, 14);
-            this.camera.position.lerp(targetCamPos, dt * 4.0);
-            this.camera.lookAt(subX, subY, 0);
-        } else if (this.camMode === 'sonar') {
-            // Vista cenital táctica batimétrica (Top-Down)
-            const targetCamPos = new THREE.Vector3(subX, subY + 70, 0);
-            this.camera.position.lerp(targetCamPos, dt * 3.0);
-            this.camera.lookAt(subX, subY, 0);
-        } else if (this.camMode === 'orbit') {
-            this.orbitControls.target.set(subX, subY, 0);
-            this.orbitControls.update();
-        }
-    }
-
-    /**
-     * Render Loop principal sincronizado con requestAnimationFrame
+     * Loop principal de renderizado a 60 FPS
      */
     animate() {
         requestAnimationFrame(this.animate);
 
         const dt = this.clock.getDelta();
 
-        // 1. Integración numérica de la física (RK4 con sub-stepping)
+        // 1. Integración numérica RK4 de la física
         this.physicsEngine.step(dt);
 
-        // 2. Actualización de modelos gráficos, fluidos y cinemática
+        // 2. Actualización de modelos gráficos, fluidos y partículas
         this.submarineModel.update(dt);
         this.environment.update(this.camera.position.y, state.y);
-        this.particleSystems.update(dt);
+        this.lightingSystem.update(this.camera, state.x, state.y);
+        this.particleEffects.update(dt);
 
-        // 3. Telemetría y módulo pedagógico
-        this.telemetryDashboard.update();
-        this.mathPanel.update();
+        // 3. Telemetría y modal de EDOs
+        this.hud.update();
+        this.mathModal.update();
 
-        // 4. Controlador de cámara
-        this.updateCamera(dt);
+        // 4. Suavizado inercial de la cámara hacia preset o seguimiento vertical
+        if (this.targetCamPos) {
+            this.camera.position.lerp(this.targetCamPos, 0.08);
+            if (this.camera.position.distanceTo(this.targetCamPos) < 0.2) {
+                this.targetCamPos = null;
+            }
+        } else {
+            // Seguir verticalmente al submarino de manera suave en OrbitControls
+            this.controls.target.y += (state.y - this.controls.target.y) * 0.06;
+        }
 
-        // 5. Renderizado final de escena
+        this.controls.update();
+
+        // 5. Renderizado final
         this.renderer.render(this.scene, this.camera);
     }
 }
@@ -179,14 +183,14 @@ if (typeof CanvasRenderingContext2D !== 'undefined' && !CanvasRenderingContext2D
 
 function initApp() {
     try {
-        console.log("Iniciando SubmarineSimulatorApp...");
-        window.__subApp = new SubmarineSimulatorApp();
-        console.log("SubmarineSimulatorApp inicializado exitosamente.");
+        console.log("Iniciando Laboratorio Virtual de Dinámica Submarina...");
+        window.__subApp = new SubmarineApp();
+        console.log("Laboratorio activo exitosamente.");
     } catch (err) {
-        console.error("Error al inicializar SubmarineSimulatorApp:", err);
+        console.error("Error al inicializar la aplicación:", err);
         const errDiv = document.createElement('div');
         errDiv.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(12,20,32,0.96);border:2px solid #ff3366;color:#ffffff;padding:28px;border-radius:12px;font-family:monospace;z-index:99999;max-width:85%;box-shadow:0 0 40px rgba(255,51,102,0.5);';
-        errDiv.innerHTML = `<h3 style="color:#ff3366;margin-bottom:12px;font-size:18px;">⚠️ Error de Inicialización Gráfica</h3><p style="color:#94a3b8;margin-bottom:12px;font-size:13px;">Se ha producido un error al cargar el simulador WebGL:</p><pre style="background:#070d18;padding:12px;border-radius:6px;color:#ff88aa;font-size:12px;overflow:auto;max-height:200px;">${err.stack || err.message || err}</pre><p style="margin-top:14px;font-size:12px;color:#00f0ff;">Por favor asegúrate de abrir el simulador mediante un servidor web (http://localhost:...) y con WebGL habilitado en tu navegador.</p>`;
+        errDiv.innerHTML = `<h3 style="color:#ff3366;margin-bottom:12px;font-size:18px;">⚠️ Error de Inicialización</h3><pre style="background:#070d18;padding:12px;border-radius:6px;color:#ff88aa;font-size:12px;overflow:auto;max-height:200px;">${err.stack || err.message || err}</pre>`;
         document.body.appendChild(errDiv);
     }
 }

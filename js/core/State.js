@@ -22,8 +22,8 @@ class SimulationState {
         this.dragMultiplier = 1.0; // Multiplicador de arrastre
 
         // Estado cinemático del submarino
-        // En Three.js: y = 0 es superficie, y < 0 es inmersión (profundidad = -y)
-        this.y = -2.0;           // Posición vertical (m) - inicia flotando en superficie
+        // En Three.js: y = 0 es superficie, y < 0 es inmersión (profundidad h = -y)
+        this.y = -0.2;          // Posición vertical (m) - inicia flotando en superficie a 0.2m
         this.vy = 0.0;          // Velocidad vertical (m/s)
         this.ay = 0.0;          // Aceleración vertical (m/s^2)
         
@@ -35,9 +35,9 @@ class SimulationState {
         this.pitchRate = 0.0;   // Velocidad angular de cabeceo (rad/s)
 
         // Estado de los tanques de lastre (MBT)
-        // Fracción de llenado inicial (~15% para flotar en superficie con reserva de flotabilidad)
-        this.fwdBallastVolume = SUBMARINE_CONSTANTS.BALLAST_MAX_VOLUME_FWD * 0.18;
-        this.aftBallastVolume = SUBMARINE_CONSTANTS.BALLAST_MAX_VOLUME_AFT * 0.18;
+        // Fracción de llenado inicial (0% para iniciar en superficie con máxima reserva de flotabilidad)
+        this.fwdBallastVolume = 0.0;
+        this.aftBallastVolume = 0.0;
         
         // Masa y volumen dinámicos
         this.ballastMass = 0.0;
@@ -152,7 +152,7 @@ class SimulationState {
      * Reinicia el submarino a la condición de flotabilidad en superficie
      */
     reset() {
-        this.y = -2.0;
+        this.y = -0.2;
         this.vy = 0.0;
         this.ay = 0.0;
         this.x = 0.0;
@@ -168,9 +168,9 @@ class SimulationState {
         this.valves.aftBlow = false;
         this.valves.emergencyBlow = false;
 
-        // Tanques al 18% para reposar en línea de flotación
-        this.fwdBallastVolume = SUBMARINE_CONSTANTS.BALLAST_MAX_VOLUME_FWD * 0.18;
-        this.aftBallastVolume = SUBMARINE_CONSTANTS.BALLAST_MAX_VOLUME_AFT * 0.18;
+        // Tanques al 0%
+        this.fwdBallastVolume = 0.0;
+        this.aftBallastVolume = 0.0;
         
         this.throttle = 0.0;
         this.propellerRPM = 0.0;

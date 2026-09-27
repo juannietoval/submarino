@@ -40,7 +40,7 @@ export const SUBMARINE_CONSTANTS = {
     CD_FORWARD: 0.16,         // Casco Albacore teardrop optimizado axialmente
 
     // Parámetros de masa y desplazamiento
-    HULL_DRY_MASS: 720000.0,  // Masa en seco del casco y maquinaria (720 toneladas)
+    HULL_DRY_MASS: 812240.0,  // Masa en seco del casco y maquinaria (Densidad inicial ~923 kg/m³)
     BASELINE_VOLUME: 880.0,   // Volumen desplazado nominal V0 (m^3) -> Flotabilidad max = 880 * 1025 * g ~ 8.85 MN
     
     // Capacidad de los Tanques de Lastre Principal (MBT - Main Ballast Tanks)
