@@ -108,6 +108,22 @@ class SubmarineApp {
                     // Vista cercana enfocando tanques de lastre
                     this.targetCamPos = new THREE.Vector3(12, subY + 2.0, 5);
                     this.controls.target.set(0, subY, 0);
+                } else if (preset === 'top') {
+                    // Vista superior dorsal (planta)
+                    this.targetCamPos = new THREE.Vector3(0.01, subY + 24.0, 0);
+                    this.controls.target.set(0, subY, 0);
+                } else if (preset === 'front') {
+                    // Vista frontal de proa
+                    this.targetCamPos = new THREE.Vector3(0, subY + 1.2, -22.0);
+                    this.controls.target.set(0, subY, 0);
+                } else if (preset === 'stern') {
+                    // Vista trasera de popa (hélice y timones)
+                    this.targetCamPos = new THREE.Vector3(0, subY + 1.2, 22.0);
+                    this.controls.target.set(0, subY, 0);
+                } else if (preset === 'interior') {
+                    // Vista cercana interior de tanques y mamparos
+                    this.targetCamPos = new THREE.Vector3(7.5, subY + 1.0, 1.5);
+                    this.controls.target.set(0, subY, 0);
                 }
             }
         };
@@ -167,8 +183,19 @@ class SubmarineApp {
                 state.blowingTimer = 8.0;
             }
 
-            if (params.has('camera') && this.cameraController) {
+            if (params.has('camX')) {
+                const cx = parseFloat(params.get('camX'));
+                const cy = parseFloat(params.get('camY') ?? (state.y + 1));
+                const cz = parseFloat(params.get('camZ') ?? 0);
+                this.camera.position.set(cx, cy, cz);
+                this.controls.target.set(0, state.y, 0);
+                this.targetCamPos = null;
+            } else if (params.has('camera') && this.cameraController) {
                 this.cameraController.setPreset(params.get('camera'));
+                if (this.targetCamPos) {
+                    this.camera.position.copy(this.targetCamPos);
+                    this.targetCamPos = null;
+                }
             }
         } catch (err) {
             console.warn("No se pudieron aplicar parámetros de URL:", err);
