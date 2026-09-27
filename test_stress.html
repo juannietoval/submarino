@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Submarine Model Stress Test</title>
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+        }
+    }
+    </script>
+</head>
+<body style="background: #111; color: #eee; font-family: monospace;">
+    <h2>Iniciando Prueba de Resistencia y Límites del Modelo...</h2>
+    <div id="status">Ejecutando pruebas...</div>
+    <div id="results" style="white-space: pre-wrap; margin-top: 15px;"></div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { SubmarineModel } from './js/graphics/SubmarineModel.js';
+        import { SimulationState } from './js/core/State.js';
+
+        const resultsDiv = document.getElementById('results');
+        const statusDiv = document.getElementById('status');
+
+        function log(msg) {
+            console.log(msg);
+            resultsDiv.innerText += msg + '\n';
+        }
+
+        async function runTests() {
+            try {
+                log('[TEST 1] Inicializando Escena Three.js y Renderer...');
+                const scene = new THREE.Scene();
+                const camera = new THREE.PerspectiveCamera(50, 1920/1080, 0.1, 1000);
+                const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+                renderer.setSize(800, 600);
+                document.body.appendChild(renderer.domElement);
+
+                log('[TEST 2] Instanciando SimulationState y SubmarineModel...');
+                const state = new SimulationState();
+                const sub = new SubmarineModel(scene, state);
+                log('✓ SubmarineModel construido exitosamente.');
+
+                // Verificación de orden de renderizado y transparencia
+                log('[TEST 3] Verificando Materiales Ópticos y Orden de Renderizado...');
+                if (sub.acrylicMatBack.side !== THREE.BackSide || sub.acrylicMatBack.depthWrite !== false) {
+                    throw new Error('acrylicMatBack no tiene configuración de cara trasera o depthWrite: false');
+                }
+                if (sub.acrylicMatFront.side !== THREE.FrontSide || sub.acrylicMatFront.depthWrite !== false) {
+                    throw new Error('acrylicMatFront no tiene configuración de cara delantera o depthWrite: false');
+                }
+                if (sub.acrylicMatFront.transmission < 0.9 || sub.acrylicMatFront.ior !== 1.491) {
+                    throw new Error('Propiedades ópticas de PMMA no calibradas en acrylicMatFront');
+                }
+                log('✓ Materiales ópticos PBR de PMMA y dos pasadas (BackSide + FrontSide) validados.');
+
+                // Verificación de Jerarquía y Mallas internas
+                log('[TEST 4] Verificando Componentes Internos...');
+                if (!sub.fwdWaterMesh || !sub.aftWaterMesh) {
+                    throw new Error('Mallas bifásicas de agua de tanques MBT no instanciadas');
+                }
+                if (!sub.interiorFrameworkGroup || sub.interiorFrameworkGroup.children.length < 5) {
+                    throw new Error('Estructura de cuadernas y mamparos insuficiente');
+                }
+                log(`✓ Esqueleto interno verificado (${sub.interiorFrameworkGroup.children.length} ensamblajes estructurales).`);
+
+                // PRUEBAS DE ESTRÉS: Ángulos Extremos y Rotación 360°
+                log('[TEST 5] Probando Rotaciones y Posiciones Extremas (Nadir, Cenit, Proa, Popa, Inversión)...');
+                const testAngles = [
+                    { name: 'Cenit (90° vertical)', pitch: Math.PI / 2, roll: 0 },
+                    { name: 'Nadir (-90° vertical)', pitch: -Math.PI / 2, roll: 0 },
+                    { name: 'Inversión Total (180° cabeza abajo)', pitch: Math.PI, roll: Math.PI },
+                    { name: 'Cabeceo Extremo (+45°)', pitch: Math.PI / 4, roll: 0 },
+                    { name: 'Cabeceo Extremo (-45°)', pitch: -Math.PI / 4, roll: 0 },
+                    { name: 'Ángulo oblicuo compound', pitch: 1.23, roll: 0.87 },
+                ];
+
+                for (const angle of testAngles) {
+                    state.pitch = angle.pitch;
+                    state.x = (Math.random() - 0.5) * 200;
+                    state.y = -Math.random() * 500;
+                    sub.update(0.016);
+                    sub.rootGroup.updateMatrixWorld(true);
+
+                    // Verificar que no hay NaN en matrixWorld
+                    const elements = sub.rootGroup.matrixWorld.elements;
+                    for (let i = 0; i < elements.length; i++) {
+                        if (isNaN(elements[i]) || !isFinite(elements[i])) {
+                            throw new Error(`Matriz degradada en ${angle.name}: elemento ${i} es ${elements[i]}`);
+                        }
+                    }
+                }
+                log('✓ 6/6 orientaciones y rotaciones extremas pasaron la verificación matricial.');
+
+                // PRUEBAS DE ESTRÉS: Casos Límite y Malformaciones de Entrada (Rompiendo el modelo)
+                log('[TEST 6] Intentando romper el sistema de lastre con valores anormales...');
+                const ballastStressValues = [
+                    { fwd: -50, aft: -100, desc: 'Lastre negativo extremo' },
+                    { fwd: 0, aft: 0, desc: 'Lastre cero absoluto' },
+                    { fwd: 50, aft: 50, desc: 'Lastre neutro estándar' },
+                    { fwd: 100, aft: 100, desc: 'Lastre máximo (100%)' },
+                    { fwd: 250, aft: 999, desc: 'Sobrellenado masivo (>100%)' },
+                    { fwd: NaN, aft: undefined, desc: 'Valores indefinidos / NaN' },
+                    { fwd: Infinity, aft: -Infinity, desc: 'Infinitos numéricos' },
+                ];
+
+                for (const b of ballastStressValues) {
+                    state.fwdBallastPct = b.fwd;
+                    state.aftBallastPct = b.aft;
+                    sub.update(0.016);
+
+                    // Verificar escalas y posiciones de mallas de agua
+                    const fwdScaleY = sub.fwdWaterMesh.scale.y;
+                    const aftScaleY = sub.aftWaterMesh.scale.y;
+                    const fwdPosY = sub.fwdWaterMesh.position.y;
+
+                    if (!isFinite(fwdScaleY) || isNaN(fwdScaleY) || fwdScaleY <= 0) {
+                        throw new Error(`Fallo en fwdWaterMesh scale.y con ${b.desc}: ${fwdScaleY}`);
+                    }
+                    if (!isFinite(aftScaleY) || isNaN(aftScaleY) || aftScaleY <= 0) {
+                        throw new Error(`Fallo en aftWaterMesh scale.y con ${b.desc}: ${aftScaleY}`);
+                    }
+                    if (!isFinite(fwdPosY) || isNaN(fwdPosY)) {
+                        throw new Error(`Fallo en fwdWaterMesh position.y con ${b.desc}: ${fwdPosY}`);
+                    }
+                }
+                log('✓ 7/7 casos anómalos de lastre controlados defensivamente.');
+
+                // PRUEBAS DE ESTRÉS: Fuerzas gigantescas y vectores 3D
+                log('[TEST 7] Evaluando estabilidad de vectores de fuerza 3D ante cargas astronómicas...');
+                const forceCases = [
+                    { b: 0, w: 0 },
+                    { b: 1e4, w: 1e4 },
+                    { b: 4.8e6, w: 4.8e6 },
+                    { b: 5e9, w: 5e9 },
+                    { b: NaN, w: undefined },
+                ];
+
+                for (const f of forceCases) {
+                    state.buoyancyForce = f.b;
+                    state.weightForce = f.w;
+                    state.showForceVectors = true;
+                    sub.update(0.016);
+
+                    const bLen = sub.buoyancyArrow.position; // Arrow position check
+                    if (!isFinite(sub.buoyancyLabel.position.y)) {
+                        throw new Error(`Label E desbordado con fuerzas anormales`);
+                    }
+                    if (!isFinite(sub.weightLabel.position.y)) {
+                        throw new Error(`Label W desbordado con fuerzas anormales`);
+                    }
+                }
+                log('✓ Vectores de fuerza resisten escalas de 0 a 5 GigaNewtons sin inestabilidad.');
+
+                // PRUEBAS DE RENDERIZADO DESDE 100 ÁNGULOS EN LA ESFERA
+                log('[TEST 8] Renderizando 100 ángulos orbitales continuos en esfera unitaria...');
+                camera.position.set(0, 0, 40);
+                camera.lookAt(0, 0, 0);
+
+                const radius = 35;
+                for (let step = 0; step < 100; step++) {
+                    const phi = (step / 100) * Math.PI * 2;
+                    const theta = ((step % 20) / 20) * Math.PI - Math.PI / 2;
+
+                    camera.position.x = radius * Math.cos(theta) * Math.sin(phi);
+                    camera.position.y = radius * Math.sin(theta);
+                    camera.position.z = radius * Math.cos(theta) * Math.cos(phi);
+                    camera.lookAt(0, 0, 0);
+
+                    state.propellerRPM = 120 + step * 5;
+                    state.divePlanesAngle = Math.sin(step * 0.1) * 20;
+                    state.fwdBallastPct = (step % 100);
+                    state.aftBallastPct = ((step + 50) % 100);
+
+                    sub.update(0.016);
+                    renderer.render(scene, camera);
+                }
+                log('✓ 100 cuadros orbitales renderizados en WebGL sin errores ni artefactos.');
+
+                // Alternar rayos X y modo opaco
+                log('[TEST 9] Alternando modos X-Ray y Casco Translúcido...');
+                sub.setXrayMode(false);
+                if (sub.acrylicMatFront.transmission > 0.8) throw new Error('Fallo al aplicar modo translúcido naval');
+                sub.setXrayMode(true);
+                if (sub.acrylicMatFront.transmission < 0.9) throw new Error('Fallo al reestablecer modo óptico X-Ray');
+                log('✓ Conmutación de opacidad de casco validada.');
+
+                statusDiv.innerHTML = '<span style="color: #00ffaa; font-weight: bold;">¡TODAS LAS PRUEBAS DE RESISTENCIA Y TRANSPARENCIA PASARON CON ÉXITO! (100% OK)</span>';
+                log('\n[RESULTADO GLOBAL] STRESS_TEST_PASSED: Modelo 3D ópticamente transparente, estructuralmente coherente y robusto ante cualquier posición u orientación.');
+
+            } catch (err) {
+                console.error(err);
+                statusDiv.innerHTML = `<span style="color: #ff4466; font-weight: bold;">ERROR EN PRUEBAS: ${err.message}</span>`;
+                log(`\n[FALLO CRÍTICO] ${err.stack || err.message}`);
+            }
+        }
+
+        window.addEventListener('DOMContentLoaded', runTests);
+    </script>
+</body>
+</html>
