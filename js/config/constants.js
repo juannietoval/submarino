@@ -56,12 +56,12 @@ export const SUBMARINE_CONSTANTS = {
     // Compresibilidad estructural del casco de presión (Ley de Hooke volumétrica)
     // delta_V / V0 = -BETA * rho * g * h
     // Coeficiente elástico calibrado para visualización didáctica y respuesta física inmediata
-    HULL_COMPRESSIBILITY_BETA: 3.5e-7, // Produce ~3% de contracción a 15m, ~7% a 25m y ~12% a 35m
+    HULL_COMPRESSIBILITY_BETA: 5.2e-7, // Produce ~3% de contracción a 10m, ~6% a 18m y ~10% a 24m
     
     // Límites operativos y de colapso estructural accesibles para experimentación pedagógica
-    MAX_OPERATING_DEPTH: 20.0,  // Cota máxima de inmersión normal (m)
-    TEST_DEPTH: 28.0,           // Cota de advertencia y fatiga elástica (m)
-    CRUSH_DEPTH: 35.0,          // Profundidad crítica de implosión por presión hidrostática (m)
+    MAX_OPERATING_DEPTH: 14.0,  // Cota máxima de inmersión normal (m)
+    TEST_DEPTH: 19.0,           // Cota de advertencia y fatiga elástica (m)
+    CRUSH_DEPTH: 24.0,          // Profundidad crítica de implosión por presión hidrostática (m)
     
     // Parámetros de propulsión
     MAX_PROPELLER_RPM: 240.0,
@@ -70,7 +70,7 @@ export const SUBMARINE_CONSTANTS = {
 
 export const ENVIRONMENT_CONSTANTS = {
     SEA_SURFACE_Y: 0.0,          // Nivel del mar en el sistema de coordenadas
-    SEABED_DEPTH: 48.0,          // Fondo marino accesible (profundidad en metros, y = -48 m)
+    SEABED_DEPTH: 32.0,          // Fondo marino accesible (profundidad en metros, y = -32 m)
     SEABED_SPRING_K: 5500000.0,  // Rigidez elástica del lecho marino para asentamiento firme (N/m)
     SEABED_DAMPING_C: 950000.0,  // Amortiguamiento viscoso del sedimento oceánico (N*s/m)
 };

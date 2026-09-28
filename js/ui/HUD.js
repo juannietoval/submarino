@@ -132,8 +132,8 @@ export class HUD {
                 <div class="implosion-alert-body">
                     <p>El casco transparente ha superado el límite elástico de compresión hidrostática. Se ha producido una implosión súbita por pandeo inelástico.</p>
                     <div class="implosion-metrics">
-                        <div><span>Profundidad de colapso:</span> <strong id="implosion-depth-val">35.0 m</strong></div>
-                        <div><span>Presión hidrostática:</span> <strong id="implosion-press-val">4.52 atm</strong></div>
+                        <div><span>Profundidad de colapso:</span> <strong id="implosion-depth-val">24.0 m</strong></div>
+                        <div><span>Presión hidrostática:</span> <strong id="implosion-press-val">3.38 atm</strong></div>
                         <div><span>Volumen residual:</span> <strong>38.0%</strong></div>
                     </div>
                     <button id="btn-implosion-reset" class="btn-emergency-action">

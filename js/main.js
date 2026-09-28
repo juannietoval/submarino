@@ -205,7 +205,7 @@ class SubmarineApp {
                 state.isImploded = true;
                 state.structuralIntegrity = 0;
                 if (!params.has('y')) {
-                    state.y = -36.0;
+                    state.y = -26.0;
                 }
                 state.updateDerivedValues();
                 state.emit('implosion', { depth: Math.max(0, -state.y), pressure: state.hydrostaticPressure });
