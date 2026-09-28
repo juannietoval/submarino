@@ -280,31 +280,29 @@ export class PhysicsEngine {
         const depth = Math.max(0, -this.state.y);
 
         if (depth >= SUBMARINE_CONSTANTS.CRUSH_DEPTH) {
-            // Se sobrepasó la profundidad de colapso: la presión supera el límite elástico
-            const excess = depth - SUBMARINE_CONSTANTS.CRUSH_DEPTH;
-            const decayRate = 50.0 + excess * 10.0; // Colapso catastrófico en menos de 0.6s
-            this.state.structuralIntegrity = Math.max(0.0, this.state.structuralIntegrity - decayRate * dt);
+            // Se sobrepasó la profundidad de colapso: la presión supera el límite elástico de pandeo (Euler/von Mises)
+            this.state.structuralIntegrity = 0.0;
 
-            if (this.state.structuralIntegrity <= 0.0 && !this.state.isImploded) {
+            if (!this.state.isImploded) {
                 this.state.isImploded = true;
                 this.state.implosionTriggered = true;
                 this.state.emit('implosion', { depth, pressure: this.state.hydrostaticPressure });
             }
         } else if (depth > SUBMARINE_CONSTANTS.TEST_DEPTH) {
-            // Zona de advertencia: fatiga estructural acelerada
-            const fatigue = (depth - SUBMARINE_CONSTANTS.TEST_DEPTH) * 2.5;
-            this.state.structuralIntegrity = Math.max(25.0, this.state.structuralIntegrity - fatigue * dt);
+            // Zona de advertencia: fatiga estructural acelerada y pandeo elástico inminente
+            const stressRatio = (depth - SUBMARINE_CONSTANTS.TEST_DEPTH) / Math.max(1.0, SUBMARINE_CONSTANTS.CRUSH_DEPTH - SUBMARINE_CONSTANTS.TEST_DEPTH);
+            this.state.structuralIntegrity = Math.max(10.0, 80.0 - (stressRatio * 70.0));
         } else if (depth > SUBMARINE_CONSTANTS.MAX_OPERATING_DEPTH) {
             // Zona operativa límite
-            const fatigue = (depth - SUBMARINE_CONSTANTS.MAX_OPERATING_DEPTH) * 0.8;
-            this.state.structuralIntegrity = Math.max(65.0, this.state.structuralIntegrity - fatigue * dt);
+            const opRatio = (depth - SUBMARINE_CONSTANTS.MAX_OPERATING_DEPTH) / Math.max(1.0, SUBMARINE_CONSTANTS.TEST_DEPTH - SUBMARINE_CONSTANTS.MAX_OPERATING_DEPTH);
+            this.state.structuralIntegrity = Math.max(80.0, 100.0 - (opRatio * 20.0));
         } else {
             // Zona segura: recuperación elástica gradual si asciende
-            this.state.structuralIntegrity = Math.min(100.0, this.state.structuralIntegrity + dt * 10.0);
+            this.state.structuralIntegrity = Math.min(100.0, this.state.structuralIntegrity + dt * 25.0);
         }
 
         if (this.state.isImploded) {
-            this.state.implosionProgress = Math.min(1.0, this.state.implosionProgress + dt * 1.6);
+            this.state.implosionProgress = Math.min(1.0, this.state.implosionProgress + dt * 4.5);
         }
     }
 

@@ -15,6 +15,7 @@
  */
 
 import * as THREE from 'three';
+import { SUBMARINE_CONSTANTS } from '../config/constants.js';
 
 export class SubmarineModel {
     constructor(scene, state) {
@@ -54,9 +55,10 @@ export class SubmarineModel {
 
         this.scene.add(this.rootGroup);
 
-        // Suscripción al evento de reinicio para restaurar geometría intacta
+        // Suscripción a eventos de física para animaciones reactivas
         if (this.state && typeof this.state.on === 'function') {
             this.state.on('reset', () => this.resetVisuals());
+            this.state.on('implosion', () => this.triggerImplosionEffect());
         }
     }
 
@@ -221,26 +223,64 @@ export class SubmarineModel {
     resetVisuals() {
         this.implosionT = 0.0;
         this.shockwaveProgress = 1.0;
+        const R = this.SUB_RADIUS;
+        const L = this.hullCylLen;
+        const T = this.tailLen;
+
         if (this.mainHull) {
             this.mainHull.scale.set(1.0, 1.0, 1.0);
             this.mainHull.position.set(0, 0, 0);
+            this.mainHull.rotation.set(Math.PI / 2, 0, 0);
+        }
+        if (this.nose) {
+            this.nose.position.set(0, 0, L / 2);
+            this.nose.rotation.set(Math.PI / 2, 0, 0);
+            this.nose.scale.set(1.0, 1.0, 1.0);
+        }
+        if (this.tail) {
+            this.tail.position.set(0, 0, -(L / 2 + T / 2));
+            this.tail.rotation.set(Math.PI / 2, 0, 0);
+            this.tail.scale.set(1.0, 1.0, 1.0);
+        }
+        if (this.shaftCasing) {
+            this.shaftCasing.position.set(0, 0, -(L / 2 + T + 0.17));
+            this.shaftCasing.rotation.set(Math.PI / 2, 0, 0);
+        }
+        if (this.propellerGroup) {
+            this.propellerGroup.position.set(0, 0, -(L / 2 + T + 0.35));
+            this.propellerGroup.rotation.set(0, 0, 0);
+        }
+        if (this.fwdFlange) {
+            this.fwdFlange.scale.set(1.0, 1.0, 1.0);
+            this.fwdFlange.position.set(0, 0, L / 2);
+            this.fwdFlange.rotation.set(0, 0, 0);
+        }
+        if (this.aftFlange) {
+            this.aftFlange.scale.set(1.0, 1.0, 1.0);
+            this.aftFlange.position.set(0, 0, -L / 2);
+            this.aftFlange.rotation.set(0, 0, 0);
         }
         if (this.internalGroup) {
             this.internalGroup.scale.set(1.0, 1.0, 1.0);
             this.internalGroup.position.set(0, 0, 0);
+            this.internalGroup.rotation.set(0, 0, 0);
         }
-        if (this.fwdFlange) this.fwdFlange.scale.set(1.0, 1.0, 1.0);
-        if (this.aftFlange) this.aftFlange.scale.set(1.0, 1.0, 1.0);
         if (this.ventralGroup) {
             this.ventralGroup.scale.set(1.0, 1.0, 1.0);
             this.ventralGroup.position.set(0, 0, 0);
         }
         if (this.sailGroup) {
             this.sailGroup.rotation.set(0, 0, 0);
-            this.sailGroup.position.set(0, this.SUB_RADIUS * 0.70, 0.65);
+            this.sailGroup.position.set(0, R * 0.70, 0.65);
         }
-        if (this.propellerGroup) {
-            this.propellerGroup.rotation.set(0, 0, 0);
+        if (this.fwdWaterMesh) {
+            this.fwdWaterMesh.scale.set(1.0, 1.0, 1.0);
+        }
+        if (this.aftWaterMesh) {
+            this.aftWaterMesh.scale.set(1.0, 1.0, 1.0);
+        }
+        if (this.calloutsGroup) {
+            this.calloutsGroup.visible = (this.state.showCallouts !== false);
         }
         if (this.shockwaveMesh) {
             this.shockwaveMesh.visible = false;
@@ -339,10 +379,10 @@ export class SubmarineModel {
 
         // Casquillo de bocina del eje de la hélice
         const shaftCasingGeo = new THREE.CylinderGeometry(R * 0.26, R * 0.24, 0.35, 24);
-        const shaftCasing = new THREE.Mesh(shaftCasingGeo, this.detailMat);
-        shaftCasing.rotation.x = Math.PI / 2;
-        shaftCasing.position.z = -(L / 2 + T + 0.17);
-        this.hullGroup.add(shaftCasing);
+        this.shaftCasing = new THREE.Mesh(shaftCasingGeo, this.detailMat);
+        this.shaftCasing.rotation.x = Math.PI / 2;
+        this.shaftCasing.position.z = -(L / 2 + T + 0.17);
+        this.hullGroup.add(this.shaftCasing);
     }
 
     /**
@@ -1108,37 +1148,67 @@ export class SubmarineModel {
 
         // --- DINÁMICA DE CONTRACCIÓN POR PRESIÓN HIDROSTÁTICA E IMPLOSIÓN ---
         const depth = Math.max(0, -posY);
-        const depthRatio = Math.min(1.0, depth / 35.0);
-        const elasticComp = 1.0 - (depthRatio * 0.12); // Contracción radial elástica hasta un 12% a 35m
+        const crushDepth = SUBMARINE_CONSTANTS.CRUSH_DEPTH || 24.0;
+        const testDepth = SUBMARINE_CONSTANTS.TEST_DEPTH || 19.0;
+        const depthRatio = Math.min(1.0, depth / crushDepth);
+        const elasticComp = 1.0 - (depthRatio * 0.10); // Contracción radial elástica progresiva (Hooke)
         const R = this.SUB_RADIUS;
         const L = this.hullCylLen;
+        const T = this.tailLen;
 
         if (!this.state.isImploded) {
+            this.implosionT = 0.0;
             // Estado de compresión elástica estructural progresiva
             let jitterX = 0;
             let jitterY = 0;
-            if (depth > 28.0) {
-                // Vibración de tensión crítica por esfuerzo estructural previo a la falla
-                const stressFactor = Math.min(1.0, (depth - 28.0) / 7.0);
+            if (depth > testDepth) {
+                // Vibración de tensión crítica por esfuerzo estructural previo al colapso (Hoop Stress Flutter)
+                const stressFactor = Math.min(1.0, (depth - testDepth) / Math.max(1.0, crushDepth - testDepth));
                 const freq = (this.state.simTime || 0) * 45.0;
-                jitterX = Math.sin(freq) * 0.014 * stressFactor;
-                jitterY = Math.cos(freq * 1.3) * 0.014 * stressFactor;
+                jitterX = Math.sin(freq) * 0.016 * stressFactor;
+                jitterY = Math.cos(freq * 1.3) * 0.016 * stressFactor;
             }
 
             const scaleRadial = elasticComp + jitterX;
             const scaleVertical = elasticComp + jitterY;
 
             if (this.mainHull) {
-                // Mantener longitud axial en 1.0 para mantener unión estanca hermética con proa y popa
                 this.mainHull.scale.set(scaleRadial, 1.0, scaleVertical);
                 this.mainHull.position.set(0, 0, 0);
+                this.mainHull.rotation.set(Math.PI / 2, 0, 0);
+            }
+            if (this.nose) {
+                this.nose.position.set(0, 0, L / 2);
+                this.nose.rotation.set(Math.PI / 2, 0, 0);
+                this.nose.scale.set(1.0, 1.0, 1.0);
+            }
+            if (this.tail) {
+                this.tail.position.set(0, 0, -(L / 2 + T / 2));
+                this.tail.rotation.set(Math.PI / 2, 0, 0);
+                this.tail.scale.set(1.0, 1.0, 1.0);
+            }
+            if (this.shaftCasing) {
+                this.shaftCasing.position.set(0, 0, -(L / 2 + T + 0.17));
+            }
+            if (this.propellerGroup) {
+                this.propellerGroup.position.set(0, 0, -(L / 2 + T + 0.35));
+                this.propellerGroup.rotation.x = 0;
+            }
+            if (this.fwdFlange) {
+                this.fwdFlange.scale.set(scaleRadial, scaleVertical, 1.0);
+                this.fwdFlange.position.set(0, 0, L / 2);
+                this.fwdFlange.rotation.set(0, 0, 0);
+            }
+            if (this.aftFlange) {
+                this.aftFlange.scale.set(scaleRadial, scaleVertical, 1.0);
+                this.aftFlange.position.set(0, 0, -L / 2);
+                this.aftFlange.rotation.set(0, 0, 0);
             }
             if (this.internalGroup) {
                 this.internalGroup.scale.set(scaleRadial * 0.98, scaleVertical * 0.98, 1.0);
                 this.internalGroup.position.set(0, 0, 0);
+                this.internalGroup.rotation.set(0, 0, 0);
             }
-            if (this.fwdFlange) this.fwdFlange.scale.set(scaleRadial, scaleVertical, 1.0);
-            if (this.aftFlange) this.aftFlange.scale.set(scaleRadial, scaleVertical, 1.0);
 
             // Ajustar posición vertical de la vela y quilla para seguir la superficie del cilindro elástico
             if (this.sailGroup) {
@@ -1149,53 +1219,98 @@ export class SubmarineModel {
                 this.ventralGroup.position.set(0, (1.0 - scaleVertical) * R * 0.92, 0);
                 this.ventralGroup.scale.set(1.0, 1.0, 1.0);
             }
-            if (this.propellerGroup) {
-                this.propellerGroup.rotation.x = 0;
-            }
         } else {
-            // Estado de Implosión Catastrófica por Aplastamiento Hidrostático
+            // Estado de Implosión Catastrófica por Aplastamiento Hidrostático (Basado en la arquitectura técnica UTP)
             this.implosionT = Math.min(1.0, (this.implosionT || 0) + deltaT * 4.5);
+            const impT = this.implosionT;
 
-            // Colapso súbito radial del 88% al 40% del diámetro original
-            const collapseRad = THREE.MathUtils.lerp(0.88, 0.40, this.implosionT);
-            const buckleSine = Math.sin(this.implosionT * Math.PI * 3.5) * 0.07 * (1.0 - this.implosionT);
-            const buckleCos = Math.cos(this.implosionT * Math.PI * 3.5) * 0.07 * (1.0 - this.implosionT);
+            // 1. Pandeo Inelástico Asimétrico Multilobular (Modo Windenburg-Trilling n=2/3)
+            const collapseRad = THREE.MathUtils.lerp(0.90, 0.40, impT);
+            const buckleSine = Math.sin(impT * Math.PI * 3.5) * 0.08 * (1.0 - impT);
+            const buckleCos = Math.cos(impT * Math.PI * 3.5) * 0.08 * (1.0 - impT);
 
-            const crushWidth = (collapseRad * 0.82) + buckleSine;
-            const crushHeight = (collapseRad * 1.18) + buckleCos;
+            const crushWidth = (collapseRad * 0.75) + buckleSine;
+            const crushHeight = (collapseRad * 1.25) + buckleCos;
+
+            // 2. Desplazamiento axial hacia el centro por diferencial de vacío interno (ΔZ)
+            // La enorme presión hidrostática externa succiona las tapas rígidas (proa y popa) hacia adentro
+            const inwardPull = impT * 0.75; // 75 cm de retracción axial violenta
 
             if (this.mainHull) {
-                this.mainHull.scale.set(crushWidth, 1.0, crushHeight);
-                this.mainHull.position.set(buckleSine * 0.15, -0.15 * this.implosionT, 0);
+                this.mainHull.scale.set(crushWidth, 1.0 - (0.15 * impT), crushHeight);
+                this.mainHull.position.set(buckleSine * 0.20, -0.22 * impT, 0);
             }
-            if (this.internalGroup) {
-                this.internalGroup.scale.set(crushWidth * 0.94, crushHeight * 0.94, 1.0);
-                this.internalGroup.position.set(buckleSine * 0.15, -0.15 * this.implosionT, 0);
-            }
-            if (this.fwdFlange) this.fwdFlange.scale.set(crushWidth, crushHeight, 1.0);
-            if (this.aftFlange) this.aftFlange.scale.set(crushWidth, crushHeight, 1.0);
 
-            if (this.sailGroup) {
-                const sailDropY = (R * 0.70) * crushHeight - (0.15 * this.implosionT);
-                this.sailGroup.position.set(buckleSine * 0.1, sailDropY, 0.65);
-                this.sailGroup.rotation.z = 0.42 * this.implosionT;
-                this.sailGroup.rotation.x = -0.16 * this.implosionT;
+            // Succión axial de la Proa Hemisférica en titanio (+Z hacia adentro)
+            if (this.nose) {
+                this.nose.position.set(buckleSine * 0.1, -0.10 * impT, (L / 2) - inwardPull);
+                this.nose.rotation.set((Math.PI / 2) + (0.12 * impT), 0, buckleSine * 0.1);
             }
-            if (this.ventralGroup) {
-                this.ventralGroup.position.set(buckleSine * 0.1, (1.0 - crushHeight) * R * 0.92 - (0.15 * this.implosionT), 0);
-                this.ventralGroup.scale.set(crushWidth, 1.0, 1.0);
+
+            // Succión axial de la Popa Cónica en acero (-Z hacia adentro)
+            if (this.tail) {
+                this.tail.position.set(-buckleSine * 0.1, -0.12 * impT, -(L / 2 + T / 2) + inwardPull);
+                this.tail.rotation.set((Math.PI / 2) - (0.15 * impT), 0, -buckleSine * 0.08);
+            }
+
+            // El eje de propulsión y hélice se trasladan solidariamente con la popa colapsada
+            if (this.shaftCasing) {
+                this.shaftCasing.position.set(-buckleSine * 0.1, -0.12 * impT, -(L / 2 + T + 0.17) + inwardPull);
             }
             if (this.propellerGroup) {
-                this.propellerGroup.rotation.x = 0.30 * this.implosionT;
+                this.propellerGroup.position.set(-buckleSine * 0.1, -0.12 * impT, -(L / 2 + T + 0.35) + inwardPull);
+                this.propellerGroup.rotation.x = 0.32 * impT;
             }
 
-            // Degradación y fractura del acrílico marino (crazing, microfisuración y oscurecimiento abisal)
+            // 3. Descalce, deformación y torsión de las bridas de unión de titanio
+            if (this.fwdFlange) {
+                this.fwdFlange.position.set(buckleSine * 0.15, -0.18 * impT, (L / 2) - inwardPull);
+                this.fwdFlange.scale.set(crushWidth, crushHeight, 1.0);
+                this.fwdFlange.rotation.z = 0.24 * impT;
+                this.fwdFlange.rotation.y = 0.12 * impT;
+            }
+            if (this.aftFlange) {
+                this.aftFlange.position.set(-buckleSine * 0.15, -0.18 * impT, -L / 2 + (inwardPull * 0.85));
+                this.aftFlange.scale.set(crushWidth, crushHeight, 1.0);
+                this.aftFlange.rotation.z = -0.20 * impT;
+                this.aftFlange.rotation.y = -0.10 * impT;
+            }
+
+            // 4. Colapso del ecosistema mecánico interno (Mamparos, rack de baterías, depósito aire y bomba)
+            if (this.internalGroup) {
+                this.internalGroup.scale.set(crushWidth * 0.94, crushHeight * 0.94, 1.0 - (0.15 * impT));
+                this.internalGroup.position.set(buckleSine * 0.20, -0.22 * impT, 0);
+                this.internalGroup.rotation.z = 0.09 * impT;
+                this.internalGroup.rotation.x = -0.06 * impT;
+            }
+
+            // 5. Hundimiento y caída con alabeo de la vela hidrodinámica
+            if (this.sailGroup) {
+                const sailDropY = (R * 0.70) * crushHeight - (0.30 * impT);
+                this.sailGroup.position.set(buckleSine * 0.15, sailDropY, 0.65 - (inwardPull * 0.2));
+                this.sailGroup.rotation.z = 0.45 * impT;
+                this.sailGroup.rotation.x = -0.20 * impT;
+            }
+
+            // 6. Colapso de válvulas ventrales
+            if (this.ventralGroup) {
+                this.ventralGroup.position.set(buckleSine * 0.1, (1.0 - crushHeight) * R * 0.92 - (0.22 * impT), 0);
+                this.ventralGroup.scale.set(crushWidth, 1.0, 1.0 - (0.15 * impT));
+            }
+
+            // 7. Colapso de las columnas de agua en los tanques
+            if (this.fwdWaterMesh) this.fwdWaterMesh.scale.set(crushWidth, crushHeight, 1.0);
+            if (this.aftWaterMesh) this.aftWaterMesh.scale.set(crushWidth, crushHeight, 1.0);
+            if (this.fwdWaterSurface) this.fwdWaterSurface.visible = false;
+            if (this.aftWaterSurface) this.aftWaterSurface.visible = false;
+
+            // 8. Crazing, microfisuración catastrófica y pérdida de transparencia del acrílico marino
             if (this.hullMat) {
-                this.hullMat.color.lerp(new THREE.Color(0x22323d), deltaT * 12.0);
-                this.hullMat.roughness = THREE.MathUtils.lerp(this.hullMat.roughness, 0.35, deltaT * 12.0);
-                this.hullMat.transmission = THREE.MathUtils.lerp(this.hullMat.transmission, 0.22, deltaT * 12.0);
-                this.hullMat.opacity = THREE.MathUtils.lerp(this.hullMat.opacity, 0.65, deltaT * 12.0);
-                this.hullMat.clearcoat = THREE.MathUtils.lerp(this.hullMat.clearcoat, 0.30, deltaT * 12.0);
+                this.hullMat.color.lerp(new THREE.Color(0xdce7f0), deltaT * 14.0);
+                this.hullMat.roughness = THREE.MathUtils.lerp(this.hullMat.roughness, 0.68, deltaT * 14.0);
+                this.hullMat.transmission = THREE.MathUtils.lerp(this.hullMat.transmission, 0.03, deltaT * 14.0);
+                this.hullMat.opacity = THREE.MathUtils.lerp(this.hullMat.opacity, 0.92, deltaT * 14.0);
+                this.hullMat.clearcoat = THREE.MathUtils.lerp(this.hullMat.clearcoat, 0.12, deltaT * 14.0);
             }
         }
 
@@ -1341,7 +1456,8 @@ export class SubmarineModel {
 
         // --- 5. ETIQUETAS TÉCNICAS UTP ---
         if (this.calloutsGroup) {
-            this.calloutsGroup.visible = (this.state.showCallouts !== false);
+            // Ocultar etiquetas automáticamente durante la implosión para evitar solapamiento visual con los restos
+            this.calloutsGroup.visible = !this.state.isImploded && (this.state.showCallouts !== false);
         }
     }
 }

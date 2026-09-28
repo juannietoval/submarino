@@ -319,7 +319,7 @@ export class ParticleEffects {
     /**
      * Ráfaga masiva de cavitación y burbujas de aire a alta velocidad por implosión catastrófica
      */
-    triggerImplosionBurst(subX = 0, subY = -35.0, subZ = 0) {
+    triggerImplosionBurst(subX = 0, subY = -25.0, subZ = 0) {
         const count = 450;
         for (let i = 0; i < count; i++) {
             const theta = Math.random() * Math.PI * 2;
