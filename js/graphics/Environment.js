@@ -24,31 +24,31 @@ export class Environment {
     }
 
     /**
-     * Color base azul petróleo (#1b2631) y niebla de profundidad
+     * Color base azul naval profundo (#0c1e33) y niebla marina homogénea
      */
     initAtmosphere() {
-        const baseColor = new THREE.Color(0x1b2631);
+        const baseColor = new THREE.Color(0x0c1e33);
         this.scene.background = baseColor;
-        this.scene.fog = new THREE.FogExp2(0x1b2631, 0.0055);
+        this.scene.fog = new THREE.FogExp2(0x0a1827, 0.005);
     }
 
     /**
-     * Cuadrícula espacial cian luminiscente (Línea base aprobada en la interfaz)
+     * Cuadrícula espacial cian luminiscente / suelo de pruebas de ingeniería
      */
     buildSpatialCyanGrid() {
-        // Cuadrícula principal en la superficie marina
-        const gridSize = 120;
-        const gridDivisions = 24;
+        // Cuadrícula principal situada bajo la quilla para no cortar transversalmente el casco acrílico
+        const gridSize = 160;
+        const gridDivisions = 32;
 
         this.gridHelper = new THREE.GridHelper(
             gridSize,
             gridDivisions,
-            0x00ffff, // Línea central cian vibrante
-            0x004444  // Malla cian sutil
+            0x38bdf8, // Línea central cian suave
+            0x1e3a5f  // Retícula estructural naval
         );
-        this.gridHelper.position.y = 0.05; // Ligeramente por encima de la superficie para evitar Z-fighting
+        this.gridHelper.position.y = -2.6; // Justo bajo la quilla en flotación
         this.gridHelper.material.transparent = true;
-        this.gridHelper.material.opacity = 0.25;
+        this.gridHelper.material.opacity = 0.38;
         this.rootGroup.add(this.gridHelper);
 
         // Cuadrícula secundaria en el fondo marino
@@ -72,14 +72,12 @@ export class Environment {
         surfaceGeom.rotateX(-Math.PI / 2);
 
         this.surfaceMat = new THREE.MeshStandardMaterial({
-            color: 0x00ffff,
+            color: 0x0284c7,
             transparent: true,
-            opacity: 0.40,
+            opacity: 0.10,
             side: THREE.DoubleSide,
-            roughness: 0.05,
-            metalness: 0.20,
-            emissive: 0x004455,
-            emissiveIntensity: 0.22,
+            roughness: 0.1,
+            metalness: 0.1,
         });
 
         this.surfaceMesh = new THREE.Mesh(surfaceGeom, this.surfaceMat);

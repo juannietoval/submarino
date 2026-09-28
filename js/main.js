@@ -40,8 +40,8 @@ class SubmarineApp {
 
         const aspect = window.innerWidth / window.innerHeight;
         this.camera = new THREE.PerspectiveCamera(45, aspect, 0.5, 2000);
-        // Posición isométrica 3/4 para que la proa apunte al frente-derecha (idéntico a la referencia)
-        this.camera.position.set(22, 6.0, -9);
+        // Posición isométrica 3/4 con proa a la izquierda y popa a la derecha (idéntico a la referencia técnica UTP)
+        this.camera.position.set(18.5, 5.2, 4.2);
 
         this.renderer = new THREE.WebGLRenderer({
             antialias: true,
@@ -107,40 +107,40 @@ class SubmarineApp {
                 const subY = state.y;
 
                 if (preset === 'side') {
-                    // Vista lateral técnica de perfil
-                    this.targetCamPos = new THREE.Vector3(26, subY, 0);
+                    // Vista lateral técnica de perfil (Proa a la izquierda, Popa a la derecha)
+                    this.targetCamPos = new THREE.Vector3(22.0, subY + 0.4, 0);
                     this.controls.target.set(0, subY, 0);
                 } else if (preset === 'iso') {
-                    // Vista isométrica 3/4 de referencia
-                    this.targetCamPos = new THREE.Vector3(22, subY + 6.0, -9);
+                    // Vista isométrica 3/4 de referencia exacta
+                    this.targetCamPos = new THREE.Vector3(18.5, subY + 5.2, 4.2);
                     this.controls.target.set(0, subY, 0);
                 } else if (preset === 'tanks') {
                     // Vista cercana perpendicular enfocando ambos tanques y sala central
-                    this.targetCamPos = new THREE.Vector3(14, subY + 1.2, 0);
+                    this.targetCamPos = new THREE.Vector3(13.0, subY + 0.4, 0);
                     this.controls.target.set(0, subY, 0);
                 } else if (preset === 'top') {
                     // Vista superior dorsal (planta)
-                    this.targetCamPos = new THREE.Vector3(0.01, subY + 24.0, 0);
+                    this.targetCamPos = new THREE.Vector3(0.01, subY + 22.0, 0.01);
                     this.controls.target.set(0, subY, 0);
                 } else if (preset === 'front') {
-                    // Vista frontal de proa
-                    this.targetCamPos = new THREE.Vector3(0, subY + 1.2, -22.0);
+                    // Vista frontal de proa (cúpula hemisférica)
+                    this.targetCamPos = new THREE.Vector3(0, subY + 0.4, 18.0);
                     this.controls.target.set(0, subY, 0);
                 } else if (preset === 'stern') {
                     // Vista trasera de popa (hélice y timones)
-                    this.targetCamPos = new THREE.Vector3(0, subY + 1.2, 22.0);
+                    this.targetCamPos = new THREE.Vector3(0, subY + 0.4, -18.0);
                     this.controls.target.set(0, subY, 0);
                 } else if (preset === 'interior') {
                     // Vista cercana interior de tanques y mamparos a través del portal
-                    this.targetCamPos = new THREE.Vector3(6.0, subY + 0.6, 0.5);
+                    this.targetCamPos = new THREE.Vector3(5.5, subY + 0.5, 0.5);
                     this.controls.target.set(0, subY, 0);
                 } else if (preset === 'bottom') {
-                    // Vista inferior ventral directa (quilla, tomas Kingston)
-                    this.targetCamPos = new THREE.Vector3(0.01, subY - 24.0, 0);
+                    // Vista inferior ventral directa (quilla, válvulas Kingston)
+                    this.targetCamPos = new THREE.Vector3(0.01, subY - 18.0, 0.01);
                     this.controls.target.set(0, subY, 0);
                 } else if (preset === 'bottom_iso') {
                     // Vista isométrica inferior 3/4 desde abajo
-                    this.targetCamPos = new THREE.Vector3(18, subY - 12.0, -10);
+                    this.targetCamPos = new THREE.Vector3(16.0, subY - 10.0, 4.0);
                     this.controls.target.set(0, subY, 0);
                 }
             }
