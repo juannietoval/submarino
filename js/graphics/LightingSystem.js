@@ -28,29 +28,39 @@ export class LightingSystem {
      * 1. Iluminación Base de Escena (Ambiente Naval Equilibrado)
      */
     initBaseLighting() {
-        // Luz ambiental suave para visibilidad global sin aplanar sombras
-        this.ambientLight = new THREE.AmbientLight(0xffffff, 0.45);
+        // Luz ambiental suave para visibilidad global y detalles mecánicos internos
+        this.ambientLight = new THREE.AmbientLight(0xffffff, 0.85);
         this.scene.add(this.ambientLight);
 
-        // Luz hemisférica con gradiente marino (cielo azul naval profundo #335577, fondo abisal #050a10)
-        this.hemiLight = new THREE.HemisphereLight(0x335577, 0x050a10, 0.65);
+        // Luz hemisférica con gradiente marino (cielo azul naval #3b82f6, fondo marino #0f172a)
+        this.hemiLight = new THREE.HemisphereLight(0x60a5fa, 0x0f172a, 0.80);
         this.hemiLight.position.set(0, 80, 0);
         this.scene.add(this.hemiLight);
 
-        // Luz direccional cenital (Sol en superficie que refracta a través del agua)
-        this.sunLight = new THREE.DirectionalLight(0xa8e6ff, 1.2);
-        this.sunLight.position.set(25, 70, 35);
-        this.sunLight.castShadow = true;
-        this.sunLight.shadow.mapSize.width = 2048;
-        this.sunLight.shadow.mapSize.height = 2048;
-        this.sunLight.shadow.camera.near = 10;
-        this.sunLight.shadow.camera.far = 300;
-        this.sunLight.shadow.camera.left = -50;
-        this.sunLight.shadow.camera.right = 50;
-        this.sunLight.shadow.camera.top = 50;
-        this.sunLight.shadow.camera.bottom = -50;
-        this.sunLight.shadow.bias = -0.0005;
-        this.scene.add(this.sunLight);
+        // Luz direccional principal frontal (Key Light desde el cuadrante del observador +X, +Y, +Z)
+        this.keyLight = new THREE.DirectionalLight(0xf0f9ff, 1.85);
+        this.keyLight.position.set(25, 40, 25);
+        this.keyLight.castShadow = true;
+        this.keyLight.shadow.mapSize.width = 2048;
+        this.keyLight.shadow.mapSize.height = 2048;
+        this.keyLight.shadow.camera.near = 5;
+        this.keyLight.shadow.camera.far = 250;
+        this.keyLight.shadow.camera.left = -40;
+        this.keyLight.shadow.camera.right = 40;
+        this.keyLight.shadow.camera.top = 40;
+        this.keyLight.shadow.camera.bottom = -40;
+        this.keyLight.shadow.bias = -0.0005;
+        this.scene.add(this.keyLight);
+
+        // Luz de relleno lateral opuesta (Fill Light para evitar sombras oscuras en babor y fondo)
+        this.fillLight = new THREE.DirectionalLight(0x93c5fd, 0.95);
+        this.fillLight.position.set(-25, 25, -25);
+        this.scene.add(this.fillLight);
+
+        // Luz trasera cenital de contorno (Rim / Backlight para destacar los perfiles del acrílico y cúpulas)
+        this.rimLight = new THREE.DirectionalLight(0x38bdf8, 1.15);
+        this.rimLight.position.set(-10, 45, -35);
+        this.scene.add(this.rimLight);
     }
 
     /**
@@ -165,8 +175,10 @@ export class LightingSystem {
         const k = PHYSICS_CONSTANTS.LIGHT_EXTINCTION_K;
         const ratio = Math.exp(-k * depth);
 
-        this.ambientLight.intensity = Math.max(0.12, 0.45 * ratio);
-        this.hemiLight.intensity = Math.max(0.15, 0.65 * ratio);
-        this.sunLight.intensity = Math.max(0.02, 1.2 * ratio);
+        this.ambientLight.intensity = Math.max(0.20, 0.85 * ratio);
+        this.hemiLight.intensity = Math.max(0.25, 0.80 * ratio);
+        if (this.keyLight) this.keyLight.intensity = Math.max(0.15, 1.85 * ratio);
+        if (this.fillLight) this.fillLight.intensity = Math.max(0.10, 0.95 * ratio);
+        if (this.rimLight) this.rimLight.intensity = Math.max(0.10, 1.15 * ratio);
     }
 }

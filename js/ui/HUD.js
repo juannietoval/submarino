@@ -97,6 +97,12 @@ export class HUD {
                         <button class="btn-cam-preset" data-preset="bottom">Ventral</button>
                     </div>
 
+                    <!-- Botón para alternar Etiquetas Técnicas del Diagrama UTP -->
+                    <button id="btn-hud-callouts" class="btn-secondary-action active" style="margin-bottom: 8px;">
+                        ${Icons.eye}
+                        <span>Etiquetas Técnicas</span>
+                    </button>
+
                     <!-- Botón de Soplado de Emergencia (Aire comprimido a 200 bar) -->
                     <button id="btn-hud-emergency" class="btn-emergency-action">
                         ${Icons.alertTriangle}
@@ -183,6 +189,15 @@ export class HUD {
                 const isXray = !this.state.hullCutaway;
                 this.submarineModel.setXrayMode(isXray);
                 btnXray.classList.toggle('active', isXray);
+            });
+        }
+
+        // 4b. Alternar Etiquetas Técnicas 3D
+        const btnCallouts = document.getElementById('btn-hud-callouts');
+        if (btnCallouts && this.submarineModel) {
+            btnCallouts.addEventListener('click', () => {
+                const isVis = this.submarineModel.toggleCallouts();
+                btnCallouts.classList.toggle('active', isVis);
             });
         }
 

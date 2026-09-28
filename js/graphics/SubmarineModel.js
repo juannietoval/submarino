@@ -1,9 +1,17 @@
 /**
  * Laboratorio Virtual de Dinámica Submarina (Física I - UTP)
- * SubmarineModel.js - Modelo 3D de Ingeniería Naval de Alta Fidelidad
- * Casco Translúcido, Ecosistema Didáctico de Lastre (Botellones HP a 200 bar, Tuberías y Válvulas),
- * Vela Hidrodinámica Albacore, Hélice Skewed de 7 Palas, Quilla Ventral, Rejillas Kingston,
- * Quillas de Balance, Compuertas de Torpedos y Planos de Corte Coplanar con Menisco Estable.
+ * SubmarineModel.js - Modelo 3D de Alta Fidelidad y Ecosistema de Lastre
+ * Basado en la referencia técnica oficial UTP:
+ * - Casco cilíndrico de acrílico ultra-translúcido cristalino
+ * - Proa hemisférica lisa en titanio/acero satinado cepillado
+ * - Vela hidrodinámica con timones de inmersión y mástiles
+ * - Depósito cilíndrico de aire comprimido (soplado) superior
+ * - Mamparos estancos y pasamuros con racks de baterías y electrónica
+ * - Tanques de lastre de proa y popa a sección completa de casco
+ * - Válvulas de inundación, purga (venteo) y evacuación con volantes rojos
+ * - Bomba de evacuación industrial azul
+ * - Hélice propulsora de 7 palas en bronce naval y timones cruciformes
+ * - Etiquetas técnicas 3D coincidentes con el diagrama educativo UTP
  */
 
 import * as THREE from 'three';
@@ -26,21 +34,23 @@ export class SubmarineModel {
         this.propellerGroup = new THREE.Group();
         this.fairwaterPlanesGroup = new THREE.Group();
         this.vectorsGroup = new THREE.Group();
+        this.calloutsGroup = new THREE.Group();
 
         this.shockwaveProgress = 1.0;
+        this.implosionT = 0.0;
 
         this.initMaterials();
         this.initShockwave();
         this.buildSubmarine();
         this.buildForceVectors();
+        this.buildCalloutLabels();
 
-        // Orientar el submarino para que la proa apunte al frente-derecha (idéntico a la referencia UTP)
-        this.hullGroup.rotation.y = Math.PI;
-        this.internalGroup.rotation.y = Math.PI;
+        // Grupos en coordenadas canónicas (Proa = +Z, Popa = -Z, Babor = +X)
 
         this.rootGroup.add(this.internalGroup);
         this.rootGroup.add(this.hullGroup);
         this.rootGroup.add(this.vectorsGroup);
+        this.rootGroup.add(this.calloutsGroup);
 
         this.scene.add(this.rootGroup);
 
@@ -51,78 +61,89 @@ export class SubmarineModel {
     }
 
     /**
-     * Inicialización de Materiales PBR Navales
+     * Inicialización de Materiales PBR Navales calibrados a la referencia UTP
      */
     initMaterials() {
-        // 1. Acero naval oscuro satinado (Proa, popa, vela, timones, quilla)
-        this.steelDarkMat = new THREE.MeshStandardMaterial({
-            color: 0x243038,
-            metalness: 0.78,
+        // 1. Titanio / Acero naval satinado cepillado (Proa, popa, vela, timones)
+        this.steelBodyMat = new THREE.MeshStandardMaterial({
+            color: 0x54667a, // Titanio / acero naval satinado de alta calidad
+            metalness: 0.72,
             roughness: 0.32,
         });
 
-        // 2. Acero / Titanio claro (Cuadernas de refuerzo, bridas, vigas, herrajes)
+        // 2. Acero pulido claro (Bridas de unión, pasamuros, herrajes)
         this.detailMat = new THREE.MeshStandardMaterial({
             color: 0xcfd8dc,
-            metalness: 0.75,
-            roughness: 0.26,
-        });
-
-        // 3. Bronce naval pulido (Hélice propulsora de 7 palas, casquillos, válvulas)
-        this.bronzeMat = new THREE.MeshStandardMaterial({
-            color: 0xd4af37,
-            metalness: 0.90,
-            roughness: 0.20,
-        });
-
-        // 4. Cobre / Latón neumático (Tuberías de soplado de aire de alta presión a 200 bar)
-        this.copperPipeMat = new THREE.MeshStandardMaterial({
-            color: 0xc87d46,
-            metalness: 0.84,
+            metalness: 0.85,
             roughness: 0.22,
         });
 
-        // 5. Botellones de aire comprimido (Acero templado a presión de 200 bar)
-        this.airFlaskMat = new THREE.MeshStandardMaterial({
-            color: 0x3e505c,
-            metalness: 0.80,
-            roughness: 0.24,
+        // 3. Bronce naval pulido (Hélice propulsora de 7 palas, bujes)
+        this.bronzeMat = new THREE.MeshStandardMaterial({
+            color: 0xd4af37,
+            metalness: 0.90,
+            roughness: 0.22,
         });
 
-        // 6. Casco Cilíndrico Translúcido (Acrílico marino limpio con brillo de superficie)
+        // 4. Acero inoxidable de tuberías y pasamuros
+        this.pipeMat = new THREE.MeshStandardMaterial({
+            color: 0xb0c4de,
+            metalness: 0.88,
+            roughness: 0.20,
+        });
+
+        // 5. Depósito cilíndrico de aire comprimido (Aluminio plateado brillante cepillado)
+        this.airTankMat = new THREE.MeshStandardMaterial({
+            color: 0xf1f5f9,
+            metalness: 0.92,
+            roughness: 0.16,
+        });
+
+        // 6. Volantes de válvulas de maniobra (Rojo industrial vibrante)
+        this.valveRedMat = new THREE.MeshStandardMaterial({
+            color: 0xdc2626,
+            roughness: 0.30,
+            metalness: 0.30,
+        });
+
+        // 7. Bomba de evacuación / Motor eléctrico (Azul industrial de la referencia UTP)
+        this.pumpBlueMat = new THREE.MeshStandardMaterial({
+            color: 0x2563eb,
+            roughness: 0.30,
+            metalness: 0.40,
+        });
+
+        // 8. Módulos de baterías (Slate oscuro industrial con bornes)
+        this.batteryMat = new THREE.MeshStandardMaterial({
+            color: 0x1e293b,
+            roughness: 0.40,
+            metalness: 0.35,
+        });
+
+        // 9. Casco Cilíndrico Translúcido (Acrílico marino cristalino con alta reflectividad y transparencia)
         this.hullMat = new THREE.MeshPhysicalMaterial({
-            color: 0xd0d8df,
-            metalness: 0.25,
-            roughness: 0.08,
-            transmission: 0.28,
-            thickness: 1.6,
+            color: 0xffffff,
+            metalness: 0.03,
+            roughness: 0.04,
+            transmission: 0.88,
+            thickness: 0.35,
+            ior: 1.49,
+            reflectivity: 0.95,
             transparent: true,
-            opacity: 0.72,
-            side: THREE.DoubleSide,
+            opacity: 0.26,
+            side: THREE.FrontSide,
             clearcoat: 1.0,
-            clearcoatRoughness: 0.06,
+            clearcoatRoughness: 0.04,
             depthWrite: false,
         });
 
-        // 7. Contenedor de tanques de lastre (cilindro translúcido sutil)
-        this.tankShellMat = new THREE.MeshStandardMaterial({
-            color: 0x88ccdd,
-            transparent: true,
-            opacity: 0.14,
-            roughness: 0.25,
-            side: THREE.DoubleSide,
-            depthWrite: false,
-        });
-
-        // 8. Fluido de agua de lastre viva (Azul cian nítido y luminoso)
+        // 10. Fluido de agua viva en los tanques (Turquesa / Cian marino luminoso)
         this.waterFillMat = new THREE.MeshStandardMaterial({
-            color: 0x00bfff,
-            emissive: 0x004466,
-            emissiveIntensity: 0.32,
-            transparent: true,
-            opacity: 0.86,
+            color: 0x38bdf8,
+            emissive: 0x0284c7,
+            emissiveIntensity: 0.18,
             roughness: 0.10,
-            metalness: 0.15,
+            metalness: 0.08,
             side: THREE.DoubleSide,
         });
 
@@ -140,43 +161,27 @@ export class SubmarineModel {
 
         // Superficie líquida horizontal (Menisco dinámico)
         this.waterSurfaceMat = new THREE.MeshStandardMaterial({
-            color: 0x66e5ff,
-            emissive: 0x005577,
-            emissiveIntensity: 0.42,
-            transparent: true,
-            opacity: 0.92,
-            roughness: 0.04,
+            color: 0x7dd3fc,
+            emissive: 0x0369a1,
+            emissiveIntensity: 0.28,
+            roughness: 0.06,
+            metalness: 0.10,
             side: THREE.DoubleSide,
-        });
-
-        // Luces de Navegación y Señalización Náutica
-        this.portNavMat = new THREE.MeshStandardMaterial({
-            color: 0xff1744,
-            emissive: 0xff1744,
-            emissiveIntensity: 1.0,
-            roughness: 0.1,
-        });
-
-        this.starboardNavMat = new THREE.MeshStandardMaterial({
-            color: 0x00e676,
-            emissive: 0x00e676,
-            emissiveIntensity: 1.0,
-            roughness: 0.1,
-        });
-
-        // Tira de iluminación LED interior
-        this.interiorLedMat = new THREE.MeshStandardMaterial({
-            color: 0x00f0ff,
-            emissive: 0x00c8e0,
-            emissiveIntensity: 0.65,
-            roughness: 0.2,
         });
 
         // Rejilla de piso antideslizante interior
         this.walkwayMat = new THREE.MeshStandardMaterial({
-            color: 0x546e7a,
-            metalness: 0.60,
-            roughness: 0.45,
+            color: 0x64748b,
+            metalness: 0.65,
+            roughness: 0.40,
+        });
+
+        // Tira de iluminación LED interior
+        this.interiorLedMat = new THREE.MeshStandardMaterial({
+            color: 0x38bdf8,
+            emissive: 0x0284c7,
+            emissiveIntensity: 0.85,
+            roughness: 0.2,
         });
     }
 
@@ -186,7 +191,7 @@ export class SubmarineModel {
     initShockwave() {
         const shockGeo = new THREE.SphereGeometry(1.0, 32, 24);
         this.shockwaveMat = new THREE.MeshBasicMaterial({
-            color: 0x66ffff,
+            color: 0x38bdf8,
             transparent: true,
             opacity: 0.0,
             side: THREE.BackSide,
@@ -232,7 +237,7 @@ export class SubmarineModel {
         }
         if (this.sailGroup) {
             this.sailGroup.rotation.set(0, 0, 0);
-            this.sailGroup.position.set(0, this.SUB_RADIUS * 0.70, this.hullCylLen * 0.20);
+            this.sailGroup.position.set(0, this.SUB_RADIUS * 0.70, 0.65);
         }
         if (this.propellerGroup) {
             this.propellerGroup.rotation.set(0, 0, 0);
@@ -241,11 +246,11 @@ export class SubmarineModel {
             this.shockwaveMesh.visible = false;
         }
         if (this.hullMat) {
-            this.hullMat.color.setHex(0xd0d8df);
-            this.hullMat.roughness = 0.08;
-            this.hullMat.metalness = 0.25;
-            this.hullMat.transmission = 0.28;
-            this.hullMat.opacity = 0.72;
+            this.hullMat.color.setHex(0xffffff);
+            this.hullMat.roughness = 0.04;
+            this.hullMat.metalness = 0.03;
+            this.hullMat.transmission = 0.88;
+            this.hullMat.opacity = 0.26;
             this.hullMat.clearcoat = 1.0;
         }
     }
@@ -258,34 +263,38 @@ export class SubmarineModel {
         const L = this.hullCylLen;
         const T = this.tailLen;
 
-        // 1. Estructura exterior (Casco transparente, juntas, proa y popa)
+        // 1. Estructura exterior (Casco transparente, juntas, proa lisa y popa)
         this.buildOuterHull(R, L, T);
 
-        // 2. Vela hidrodinámica Albacore y planos de inmersión en la vela
+        // 2. Vela hidrodinámica limpia Albacore y planos de inmersión en la vela
         this.buildHydrodynamicSail(R, L);
 
         // 3. Propulsión y empenaje de popa (Hélice 7 palas y timones en cruz)
         this.buildSternPropulsionAndEmpennage(R, L, T);
 
-        // 4. Quilla ventral, tomas de mar Kingston y quillas de balance (Vistas inferiores)
-        this.buildVentralKeelAndIntakes(R, L);
-
-        // 5. Ecosistema mecánico interior (Cuadernas, vigas, botellones, tuberías, mamparos y tanques)
+        // 4. Ecosistema mecánico interior (Mamparos, rack de baterías, depósito aire, bombas y tuberías)
         this.buildInternalFrameworkAndMechanisms(R, L);
+
+        // 5. Tanques de lastre a sección completa (Proa y Popa)
+        this.buildBallastTanks(R, L);
+
+        // 6. Partículas de agitación y aeración interna en los tanques
+        this.initInternalTankAeration();
     }
 
     /**
-     * 1. Casco Exterior con Anillos de Unión Estancos y Proa con Compuertas de Torpedos
+     * 1. Casco Exterior con Anillos de Unión Estancos, Proa Lisa y Válvula de Purga
      */
     buildOuterHull(R, L, T) {
-        // A. Casco Central Cilíndrico Translúcido
-        const mainHullGeo = new THREE.CylinderGeometry(R, R, L, 40);
+        // A. Casco Central Cilíndrico Ultra-Translúcido
+        const mainHullGeo = new THREE.CylinderGeometry(R, R, L, 48);
         this.mainHull = new THREE.Mesh(mainHullGeo, this.hullMat);
         this.mainHull.rotation.x = Math.PI / 2;
+        this.mainHull.renderOrder = 10; // Garantiza pase de transmisión posterior a fluidos internos
         this.hullGroup.add(this.mainHull);
 
         // B. Anillos de Brida Reforzada (Juntas estancas entre acrílico y acero)
-        const flangeGeo = new THREE.TorusGeometry(R * 1.018, 0.055, 16, 40);
+        const flangeGeo = new THREE.TorusGeometry(R * 1.015, 0.045, 16, 48);
         this.fwdFlange = new THREE.Mesh(flangeGeo, this.detailMat);
         this.fwdFlange.position.z = L / 2;
         this.hullGroup.add(this.fwdFlange);
@@ -294,62 +303,42 @@ export class SubmarineModel {
         this.aftFlange.position.z = -L / 2;
         this.hullGroup.add(this.aftFlange);
 
-        // C. Proa Hemisférica en Acero Naval (+Z)
-        const noseGeo = new THREE.SphereGeometry(R, 40, 20, 0, Math.PI * 2, 0, Math.PI / 2);
-        this.nose = new THREE.Mesh(noseGeo, this.steelDarkMat);
+        // C. Proa Hemisférica Lisa en Titanio/Acero Satinado (+Z)
+        const noseGeo = new THREE.SphereGeometry(R, 48, 24, 0, Math.PI * 2, 0, Math.PI / 2);
+        this.nose = new THREE.Mesh(noseGeo, this.steelBodyMat);
         this.nose.rotation.x = Math.PI / 2;
         this.nose.position.z = L / 2;
         this.hullGroup.add(this.nose);
 
-        // Cúpula frontal de sonar pasivo en la proa
-        const sonarCapGeo = new THREE.SphereGeometry(R * 0.38, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2);
-        const sonarCap = new THREE.Mesh(sonarCapGeo, this.detailMat);
-        sonarCap.rotation.x = Math.PI / 2;
-        sonarCap.position.z = L / 2 + R * 0.90;
-        this.hullGroup.add(sonarCap);
+        // D. Válvula de Purga de Aire (Venteo) en la cumbre del casco sobre el tanque de proa
+        const ventZ = 3.45; // Sobre el tanque de proa
+        const ventGroup = new THREE.Group();
+        ventGroup.position.set(0, R, ventZ);
 
-        // Compuertas exteriores de tubos lanzatorpedos (matriz 2x2 en la proa de acero)
-        const torpedoPositions = [
-            [-0.42, 0.32],
-            [0.42, 0.32],
-            [-0.42, -0.32],
-            [0.42, -0.32]
-        ];
-        const doorGeo = new THREE.CylinderGeometry(0.19, 0.19, 0.04, 20);
-        doorGeo.rotateX(Math.PI / 2);
-        const doorRimGeo = new THREE.TorusGeometry(0.19, 0.025, 10, 24);
+        const ventNipple = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.22, 16), this.detailMat);
+        ventNipple.position.y = 0.11;
+        ventGroup.add(ventNipple);
 
-        for (const [tx, ty] of torpedoPositions) {
-            const doorGroup = new THREE.Group();
-            doorGroup.position.set(tx, ty, L / 2 + R * 0.76);
+        const ventKnob = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.065, 0.08, 16), this.steelBodyMat);
+        ventKnob.position.y = 0.24;
+        ventGroup.add(ventKnob);
 
-            const doorCap = new THREE.Mesh(doorGeo, this.steelDarkMat);
-            const doorRim = new THREE.Mesh(doorRimGeo, this.detailMat);
-            const hinge = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.08, 0.05), this.detailMat);
-            hinge.position.set(-0.20, 0, 0.02);
+        const ventCollar = new THREE.Mesh(new THREE.TorusGeometry(0.05, 0.015, 8, 16), this.detailMat);
+        ventCollar.rotation.x = Math.PI / 2;
+        ventCollar.position.y = 0.16;
+        ventGroup.add(ventCollar);
 
-            doorGroup.add(doorCap);
-            doorGroup.add(doorRim);
-            doorGroup.add(hinge);
-            this.hullGroup.add(doorGroup);
-        }
+        this.hullGroup.add(ventGroup);
 
-        // Domo de sonar de barbilla (Chin Sonar Array) en la curvatura inferior de proa
-        const chinSonarGeo = new THREE.SphereGeometry(0.40, 20, 12);
-        chinSonarGeo.scale(0.85, 0.55, 1.3);
-        const chinSonar = new THREE.Mesh(chinSonarGeo, this.steelDarkMat);
-        chinSonar.position.set(0, -R * 0.72, L / 2 + R * 0.45);
-        this.hullGroup.add(chinSonar);
-
-        // D. Popa Cónica Hidrodinámica en Acero (-Z)
-        const tailGeo = new THREE.CylinderGeometry(R, R * 0.28, T, 40);
-        this.tail = new THREE.Mesh(tailGeo, this.steelDarkMat);
+        // E. Popa Cónica Hidrodinámica en Acero (-Z)
+        const tailGeo = new THREE.CylinderGeometry(R, R * 0.26, T, 48);
+        this.tail = new THREE.Mesh(tailGeo, this.steelBodyMat);
         this.tail.rotation.x = Math.PI / 2;
         this.tail.position.z = -(L / 2 + T / 2);
         this.hullGroup.add(this.tail);
 
         // Casquillo de bocina del eje de la hélice
-        const shaftCasingGeo = new THREE.CylinderGeometry(R * 0.28, R * 0.26, 0.35, 24);
+        const shaftCasingGeo = new THREE.CylinderGeometry(R * 0.26, R * 0.24, 0.35, 24);
         const shaftCasing = new THREE.Mesh(shaftCasingGeo, this.detailMat);
         shaftCasing.rotation.x = Math.PI / 2;
         shaftCasing.position.z = -(L / 2 + T + 0.17);
@@ -357,97 +346,33 @@ export class SubmarineModel {
     }
 
     /**
-     * 2. Quilla Ventral, Tomas de Mar Kingston y Quillas de Balance (Vistas Inferiores)
-     */
-    buildVentralKeelAndIntakes(R, L) {
-        this.ventralGroup = new THREE.Group();
-
-        // A. Quilla Externa Longitudinal de Protección Naval
-        const keelBarGeo = new THREE.BoxGeometry(0.18, 0.10, L * 0.98);
-        const keelBar = new THREE.Mesh(keelBarGeo, this.steelDarkMat);
-        keelBar.position.set(0, -R - 0.05, 0);
-        this.ventralGroup.add(keelBar);
-
-        // B. Rejillas de Inundación de Válvulas Kingston (Bajo tanques proel y popel)
-        const tankZs = [L * 0.25, -L * 0.25];
-        const grateWidth = 0.55;
-        const grateLength = 1.35;
-
-        for (const tz of tankZs) {
-            const grateFrameGroup = new THREE.Group();
-            grateFrameGroup.position.set(0, -R - 0.02, tz);
-
-            // Marco perimetral de acero
-            const frameGeo = new THREE.BoxGeometry(grateWidth, 0.06, grateLength);
-            const frameMesh = new THREE.Mesh(frameGeo, this.steelDarkMat);
-            grateFrameGroup.add(frameMesh);
-
-            // 8 ranuras transversales de aspiración de agua
-            const numBars = 8;
-            const barSpacing = (grateLength * 0.85) / numBars;
-            const barGeo = new THREE.BoxGeometry(grateWidth * 0.90, 0.04, 0.035);
-
-            for (let b = 0; b < numBars; b++) {
-                const barMesh = new THREE.Mesh(barGeo, this.detailMat);
-                const bz = -grateLength * 0.42 + (b * barSpacing) + barSpacing / 2;
-                barMesh.position.set(0, -0.02, bz);
-                grateFrameGroup.add(barMesh);
-            }
-
-            this.ventralGroup.add(grateFrameGroup);
-        }
-
-        // C. Quillas de Balance Laterales (Bilge Keels) para amortiguamiento de rolido
-        const bkLength = L * 0.65;
-        const bkWidth = 0.22;
-        const bkThick = 0.035;
-        const bkAngle = Math.PI / 4; // 45 grados en pantoque
-
-        const bkGeo = new THREE.BoxGeometry(bkWidth, bkThick, bkLength);
-
-        // Quilla de balance babor (izquierda: -X)
-        const bkPort = new THREE.Mesh(bkGeo, this.steelDarkMat);
-        bkPort.position.set(-R * Math.cos(bkAngle) - 0.06, -R * Math.sin(bkAngle) - 0.06, 0);
-        bkPort.rotation.z = -bkAngle;
-        this.ventralGroup.add(bkPort);
-
-        // Quilla de balance estribor (derecha: +X)
-        const bkStarboard = new THREE.Mesh(bkGeo, this.steelDarkMat);
-        bkStarboard.position.set(R * Math.cos(bkAngle) + 0.06, -R * Math.sin(bkAngle) - 0.06, 0);
-        bkStarboard.rotation.z = bkAngle;
-        this.ventralGroup.add(bkStarboard);
-
-        this.hullGroup.add(this.ventralGroup);
-    }
-
-    /**
-     * 3. Vela Hidrodinámica Albacore y Planos de Inmersión NACA
+     * 2. Vela Hidrodinámica Albacore y Planos de Inmersión NACA
      */
     buildHydrodynamicSail(R, L) {
         this.sailGroup.clear();
-        this.sailGroup.position.set(0, R * 0.70, L * 0.20);
+        this.sailGroup.position.set(0, R * 0.70, 0.65);
 
-        const sailWidth = R * 0.65;
-        const sailLength = R * 1.85;
-        const sailHeight = R * 1.45;
+        const sailWidth = R * 0.58;
+        const sailLength = R * 1.05; // 1.58m de cuerda hidrodinámica
+        const sailHeight = R * 1.25;
 
-        // Geometría extrusionada con perfil hidrodinámico teardrop (borde ataque curvo, borde fuga afilado)
+        // Geometría extrusionada con perfil hidrodinámico teardrop (borde ataque curvo, borde fuga suave)
         const sailShape = new THREE.Shape();
         const halfW = sailWidth / 2;
         const halfL = sailLength / 2;
 
         sailShape.moveTo(0, halfL);
         sailShape.bezierCurveTo(halfW, halfL, halfW, halfL * 0.35, halfW, 0);
-        sailShape.bezierCurveTo(halfW, -halfL * 0.45, halfW * 0.25, -halfL * 0.85, 0, -halfL);
-        sailShape.bezierCurveTo(-halfW * 0.25, -halfL * 0.85, -halfW, -halfL * 0.45, -halfW, 0);
+        sailShape.bezierCurveTo(halfW, -halfL * 0.45, halfW * 0.30, -halfL * 0.85, 0, -halfL);
+        sailShape.bezierCurveTo(-halfW * 0.30, -halfL * 0.85, -halfW, -halfL * 0.45, -halfW, 0);
         sailShape.bezierCurveTo(-halfW, halfL * 0.35, -halfW, halfL, 0, halfL);
 
         const extrudeSettings = {
             steps: 1,
             depth: sailHeight,
             bevelEnabled: true,
-            bevelThickness: 0.09,
-            bevelSize: 0.06,
+            bevelThickness: 0.08,
+            bevelSize: 0.05,
             bevelSegments: 4,
         };
 
@@ -455,21 +380,21 @@ export class SubmarineModel {
         sailGeo.rotateX(Math.PI / 2);
         sailGeo.center();
 
-        const sailMesh = new THREE.Mesh(sailGeo, this.steelDarkMat);
+        const sailMesh = new THREE.Mesh(sailGeo, this.steelBodyMat);
         sailMesh.position.y = sailHeight / 2;
         this.sailGroup.add(sailMesh);
 
-        // Cúpula superior de observación / puente de mando
-        const bridgeGeo = new THREE.SphereGeometry(halfW * 0.90, 16, 12, 0, Math.PI * 2, 0, Math.PI / 2);
+        // Cúpula superior de puente de mando
+        const bridgeGeo = new THREE.SphereGeometry(halfW * 0.88, 16, 12, 0, Math.PI * 2, 0, Math.PI / 2);
         const bridgeMesh = new THREE.Mesh(bridgeGeo, this.detailMat);
-        bridgeMesh.position.set(0, sailHeight + 0.04, halfL * 0.25);
-        bridgeMesh.scale.set(1.0, 0.45, 1.4);
+        bridgeMesh.position.set(0, sailHeight + 0.03, halfL * 0.20);
+        bridgeMesh.scale.set(1.0, 0.40, 1.3);
         this.sailGroup.add(bridgeMesh);
 
         // Timones de Inmersión en la Vela con perfil hidroala NACA (Fairwater Planes)
-        const planeSpan = 1.35;
-        const planeChord = 0.65;
-        const planeThick = 0.12; // Perfil con volumen aerodinámico real
+        const planeSpan = 1.05;
+        const planeChord = 0.52;
+        const planeThick = 0.085;
 
         const planeShape = new THREE.Shape();
         planeShape.moveTo(0, planeChord * 0.5);
@@ -488,121 +413,94 @@ export class SubmarineModel {
         planeGeo.rotateZ(Math.PI / 2);
         planeGeo.center();
 
-        // Plano babor (izquierda)
-        const planeLeft = new THREE.Mesh(planeGeo, this.steelDarkMat);
-        planeLeft.position.set(halfW + planeSpan / 2 + 0.02, sailHeight * 0.60, 0);
-
-        // Luz de navegación babor (rojo)
-        const navRed = new THREE.Mesh(new THREE.SphereGeometry(0.04, 10, 8), this.portNavMat);
-        navRed.position.set(planeSpan / 2, 0, 0);
-        planeLeft.add(navRed);
+        const planeLeft = new THREE.Mesh(planeGeo, this.steelBodyMat);
+        planeLeft.position.set(halfW + planeSpan / 2 + 0.02, sailHeight * 0.52, 0);
         this.fairwaterPlanesGroup.add(planeLeft);
 
-        // Plano estribor (derecha)
-        const planeRight = new THREE.Mesh(planeGeo, this.steelDarkMat);
-        planeRight.position.set(-(halfW + planeSpan / 2 + 0.02), sailHeight * 0.60, 0);
-
-        // Luz de navegación estribor (verde)
-        const navGreen = new THREE.Mesh(new THREE.SphereGeometry(0.04, 10, 8), this.starboardNavMat);
-        navGreen.position.set(-planeSpan / 2, 0, 0);
-        planeRight.add(navGreen);
+        const planeRight = new THREE.Mesh(planeGeo, this.steelBodyMat);
+        planeRight.position.set(-(halfW + planeSpan / 2 + 0.02), sailHeight * 0.52, 0);
         this.fairwaterPlanesGroup.add(planeRight);
 
-        // Eje pasante del timón de inmersión con bridas de pivote hidráulico
-        const planeShaftGeo = new THREE.CylinderGeometry(0.055, 0.055, halfW * 2 + 0.14, 16);
+        const planeShaftGeo = new THREE.CylinderGeometry(0.05, 0.05, halfW * 2 + 0.12, 16);
         const planeShaft = new THREE.Mesh(planeShaftGeo, this.detailMat);
         planeShaft.rotation.z = Math.PI / 2;
-        planeShaft.position.set(0, sailHeight * 0.60, 0);
+        planeShaft.position.set(0, sailHeight * 0.52, 0);
         this.fairwaterPlanesGroup.add(planeShaft);
 
         this.sailGroup.add(this.fairwaterPlanesGroup);
 
-        // Mástiles Retráctiles Detallados (Periscopios, radar y snorkel)
-        // 1. Periscopio de ataque (esbelto con cabezal óptico y prisma de bronce)
-        const mast1 = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 1.30, 16), this.detailMat);
-        mast1.position.set(0.14, sailHeight + 0.65, halfL * 0.10);
-        const opticHead1 = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.045, 0.18, 16), this.bronzeMat);
-        opticHead1.position.set(0.14, sailHeight + 1.28, halfL * 0.10);
+        // 3 Mástiles Verticales Retráctiles (Periscopios y radar) idénticos al esquema UTP
+        const mastGeo1 = new THREE.CylinderGeometry(0.04, 0.04, 1.15, 16);
+        const mast1 = new THREE.Mesh(mastGeo1, this.detailMat);
+        mast1.position.set(0, sailHeight + 0.58, halfL * 0.15);
+        const opticHead1 = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.04, 0.14, 16), this.steelBodyMat);
+        opticHead1.position.set(0, sailHeight + 1.18, halfL * 0.15);
         this.sailGroup.add(mast1);
         this.sailGroup.add(opticHead1);
 
-        // 2. Periscopio de búsqueda y satélite con radomo
-        const mast2 = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 1.00, 16), this.detailMat);
-        mast2.position.set(-0.14, sailHeight + 0.50, -halfL * 0.15);
-        const opticHead2 = new THREE.Mesh(new THREE.SphereGeometry(0.075, 12, 10), this.steelDarkMat);
-        opticHead2.position.set(-0.14, sailHeight + 0.98, -halfL * 0.15);
+        const mastGeo2 = new THREE.CylinderGeometry(0.04, 0.04, 0.95, 16);
+        const mast2 = new THREE.Mesh(mastGeo2, this.detailMat);
+        mast2.position.set(0, sailHeight + 0.48, -halfL * 0.10);
+        const opticHead2 = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.04, 0.14, 16), this.steelBodyMat);
+        opticHead2.position.set(0, sailHeight + 0.98, -halfL * 0.10);
         this.sailGroup.add(mast2);
         this.sailGroup.add(opticHead2);
 
-        // 3. Mástil Snorkel de inducción con válvula de flotador
-        const mast3 = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.065, 0.75, 16), this.steelDarkMat);
-        mast3.position.set(0, sailHeight + 0.36, -halfL * 0.45);
-        const snorkelHead = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.065, 0.15, 16), this.detailMat);
-        snorkelHead.position.set(0, sailHeight + 0.72, -halfL * 0.45);
+        const mastGeo3 = new THREE.CylinderGeometry(0.04, 0.04, 0.75, 16);
+        const mast3 = new THREE.Mesh(mastGeo3, this.detailMat);
+        mast3.position.set(0, sailHeight + 0.38, -halfL * 0.35);
+        const opticHead3 = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.04, 0.14, 16), this.steelBodyMat);
+        opticHead3.position.set(0, sailHeight + 0.78, -halfL * 0.35);
         this.sailGroup.add(mast3);
-        this.sailGroup.add(snorkelHead);
+        this.sailGroup.add(opticHead3);
 
         this.hullGroup.add(this.sailGroup);
     }
 
     /**
-     * 4. Hélice Naval Skewed de 7 Palas y Empenaje Cruciforme
+     * 3. Hélice Naval Skewed de 7 Palas y Timones Cruciformes
      */
     buildSternPropulsionAndEmpennage(R, L, T) {
-        // A. Timones Cruciformes (Estabilizadores de popa)
+        // A. Timones Cruciformes
         const finZ = -(L / 2 + T * 0.50);
         const finHeight = R * 0.95;
         const finLength = T * 0.65;
 
-        // Aleta vertical superior
+        // Aleta vertical superior (Borde de ataque biselado como en la referencia)
         const vFinGeo = new THREE.BoxGeometry(0.09, finHeight, finLength);
-        const vFinTop = new THREE.Mesh(vFinGeo, this.steelDarkMat);
+        const vFinTop = new THREE.Mesh(vFinGeo, this.steelBodyMat);
         vFinTop.position.set(0, R * 0.65, finZ);
         this.hullGroup.add(vFinTop);
 
-        // Aleta vertical inferior (patín de quilla)
-        const vFinBot = new THREE.Mesh(vFinGeo, this.steelDarkMat);
+        // Aleta vertical inferior
+        const vFinBot = new THREE.Mesh(vFinGeo, this.steelBodyMat);
         vFinBot.position.set(0, -R * 0.65, finZ);
         this.hullGroup.add(vFinBot);
 
-        // Aletas horizontales (timones de profundidad popel)
+        // Aletas horizontales
         const hFinGeo = new THREE.BoxGeometry(finHeight * 1.90, 0.09, finLength);
-        const hFin = new THREE.Mesh(hFinGeo, this.steelDarkMat);
+        const hFin = new THREE.Mesh(hFinGeo, this.steelBodyMat);
         hFin.position.set(0, 0, finZ);
         this.hullGroup.add(hFin);
 
-        // Tapas de extremo de estabilizador
-        const capGeo = new THREE.CylinderGeometry(0.07, 0.07, finLength, 12);
-        capGeo.rotateX(Math.PI / 2);
-
-        const capTop = new THREE.Mesh(capGeo, this.detailMat);
-        capTop.position.set(0, R * 0.65 + finHeight / 2, finZ);
-        this.hullGroup.add(capTop);
-
-        const capBot = new THREE.Mesh(capGeo, this.detailMat);
-        capBot.position.set(0, -(R * 0.65 + finHeight / 2), finZ);
-        this.hullGroup.add(capBot);
-
-        // B. Hélice Naval Skewed de 7 Palas de Alta Eficiencia
+        // B. Hélice Naval Skewed en Bronce
         const propZ = -(L / 2 + T + 0.35);
         this.propellerGroup.position.set(0, 0, propZ);
 
-        // Cono de ojiva de hélice en bronce
+        // Cono de ojiva en bronce
         const hubGeo = new THREE.ConeGeometry(R * 0.24, 0.60, 24);
         hubGeo.rotateX(Math.PI / 2);
         const hub = new THREE.Mesh(hubGeo, this.bronzeMat);
         this.propellerGroup.add(hub);
 
-        // Anillo de fijación del cubo
         const hubRingGeo = new THREE.CylinderGeometry(R * 0.24, R * 0.24, 0.12, 24);
         hubRingGeo.rotateX(Math.PI / 2);
         const hubRing = new THREE.Mesh(hubRingGeo, this.detailMat);
         hubRing.position.z = 0.20;
         this.propellerGroup.add(hubRing);
 
-        // Generación geométrica de las 7 palas alabeadas con curvatura parabólica
         const numBlades = 7;
-        const bladeRadius = R * 0.92;
+        const bladeRadius = R * 0.90;
         const bladeWidth = 0.38;
 
         const bladeShape = new THREE.Shape();
@@ -627,8 +525,8 @@ export class SubmarineModel {
             const phi = (Math.PI * 2 / numBlades) * i;
             blade.position.z = -0.16;
             blade.rotation.z = phi;
-            blade.rotation.y = 0.40; // Ángulo de paso hidrodinámico
-            blade.rotation.x = 0.14; // Inclinación axial (Rake)
+            blade.rotation.y = 0.40;
+            blade.rotation.x = 0.14;
             this.propellerGroup.add(blade);
         }
 
@@ -636,353 +534,336 @@ export class SubmarineModel {
     }
 
     /**
-     * 5. Ecosistema Mecánico Interior Completo (El Mecanismo de Hundimiento)
+     * 4. Ecosistema Mecánico Interior Completo (El Mecanismo de Hundimiento)
+     * Exactamente como en el diagrama técnico UTP:
+     * - Mamparos y Pasamuros Estancos
+     * - Depósito Cilíndrico Superior de Aire Comprimido (Soplado)
+     * - Rack de Baterías y Electrónica en bandeja inferior
+     * - Bomba Eléctrica de Evacuación Azul
+     * - Válvulas de Inundación y Evacuación con Volantes Rojos
+     * - Tuberías de distribución y soplado
      */
     buildInternalFrameworkAndMechanisms(R, L) {
-        // A. Cuadernas Anulares Maestras (6 Anillos estructurales de titanio/acero)
-        const numRibs = 6;
-        const ribGeo = new THREE.TorusGeometry(R * 0.95, 0.048, 16, 40);
-        for (let i = 0; i < numRibs; i++) {
-            const rib = new THREE.Mesh(ribGeo, this.detailMat);
-            const zPos = -L / 2 + (L / (numRibs - 1)) * i;
-            rib.position.z = zPos;
-            this.internalGroup.add(rib);
-        }
+        this.ventralGroup = new THREE.Group();
 
-        // B. Vigas Longitudinales de Refuerzo Naval (Quilla y Bao Dorsal)
-        const stringerLen = L * 0.98;
-        const stringerGeo = new THREE.BoxGeometry(0.12, 0.07, stringerLen);
+        // A. Mamparos y Pasamuros Estancos (Circular bulkheads with ports)
+        const bulkheadRadius = R * 0.965;
+        const portalRadius = bulkheadRadius * 0.50; // Paso circular amplio
 
-        // Viga de Quilla interna (Keelson - en el fondo del casco)
-        const keelBeam = new THREE.Mesh(stringerGeo, this.detailMat);
-        keelBeam.position.set(0, -R * 0.91, 0);
-        this.internalGroup.add(keelBeam);
-
-        // Larguero dorsal (Spine stringer - en la parte superior)
-        const spineBeam = new THREE.Mesh(stringerGeo, this.detailMat);
-        spineBeam.position.set(0, R * 0.91, 0);
-        this.internalGroup.add(spineBeam);
-
-        // Tira de iluminación LED técnica dorsal (Luz cian que baña la maquinaria interna)
-        const ledStripGeo = new THREE.BoxGeometry(0.04, 0.02, L * 0.94);
-        const ledStrip = new THREE.Mesh(ledStripGeo, this.interiorLedMat);
-        ledStrip.position.set(0, R * 0.88, 0);
-        this.internalGroup.add(ledStrip);
-
-        // C. Piso de Rejilla Metálica Antideslizante (Deck Walkway Grating)
-        const deckGeo = new THREE.BoxGeometry(R * 0.82, 0.03, L * 0.92);
-        const deckMesh = new THREE.Mesh(deckGeo, this.walkwayMat);
-        deckMesh.position.set(0, -R * 0.62, 0);
-        this.internalGroup.add(deckMesh);
-
-        // D. Mamparos Estancos con Portal Central Abierto (Visión Longitudinal Axial Completa)
-        const bulkheadRadius = R * 0.93;
-        const portalRadius = bulkheadRadius * 0.46; // Diámetro de paso de 1.4m
-
-        // Geometría anular con agujero central para que nunca bloquee la vista entre compartimentos
         const bulkheadShape = new THREE.Shape();
         bulkheadShape.absarc(0, 0, bulkheadRadius, 0, Math.PI * 2, false);
+
+        // Agujero central
         const holePath = new THREE.Path();
-        holePath.absarc(0, 0, portalRadius, 0, Math.PI * 2, true);
+        holePath.absarc(0, -0.05, portalRadius, 0, Math.PI * 2, true);
         bulkheadShape.holes.push(holePath);
+
+        // Pasamuros superior para tubería de aire de soplado
+        const airHole = new THREE.Path();
+        airHole.absarc(0, R * 0.70, 0.065, 0, Math.PI * 2, true);
+        bulkheadShape.holes.push(airHole);
+
+        // Pasamuros inferior para tubería de agua
+        const waterHole = new THREE.Path();
+        waterHole.absarc(0, -R * 0.78, 0.08, 0, Math.PI * 2, true);
+        bulkheadShape.holes.push(waterHole);
 
         const bulkheadExtrude = {
             steps: 1,
-            depth: 0.07,
+            depth: 0.10,
             bevelEnabled: true,
-            bevelThickness: 0.015,
-            bevelSize: 0.01,
+            bevelThickness: 0.02,
+            bevelSize: 0.015,
             bevelSegments: 2,
         };
         const bulkheadGeo = new THREE.ExtrudeGeometry(bulkheadShape, bulkheadExtrude);
         bulkheadGeo.center();
 
-        // Mamparo estanco proel (Z = +1.15)
-        const fwdBulkhead = new THREE.Mesh(bulkheadGeo, this.steelDarkMat);
-        fwdBulkhead.position.z = 1.15;
-        this.buildBulkheadDetails(fwdBulkhead, bulkheadRadius, portalRadius);
+        // 1. Mamparo Estanco Proel (+Z = 1.40 m)
+        const fwdBulkhead = new THREE.Mesh(bulkheadGeo, this.steelBodyMat);
+        fwdBulkhead.position.z = 1.40;
+        this.buildBulkheadTrim(fwdBulkhead, bulkheadRadius, portalRadius);
         this.internalGroup.add(fwdBulkhead);
 
-        // Mamparo estanco popel (Z = -1.15)
-        const aftBulkhead = new THREE.Mesh(bulkheadGeo, this.steelDarkMat);
-        aftBulkhead.position.z = -1.15;
-        this.buildBulkheadDetails(aftBulkhead, bulkheadRadius, portalRadius);
+        // 2. Mamparo Estanco Popel (-Z = -1.40 m)
+        const aftBulkhead = new THREE.Mesh(bulkheadGeo, this.steelBodyMat);
+        aftBulkhead.position.z = -1.40;
+        this.buildBulkheadTrim(aftBulkhead, bulkheadRadius, portalRadius);
         this.internalGroup.add(aftBulkhead);
 
-        // E. Banco de 6 Botellones de Aire Comprimido (HP Air Flasks a 200 bar) con Cunas
-        this.buildHighPressureAirBank(R);
+        // B. Bandeja de Piso de Rejilla Metálica entre mamparos
+        const deckGeo = new THREE.BoxGeometry(R * 1.15, 0.035, 2.65);
+        const deckMesh = new THREE.Mesh(deckGeo, this.walkwayMat);
+        deckMesh.position.set(0, -R * 0.58, 0);
+        this.internalGroup.add(deckMesh);
 
-        // F. Tuberías Neumáticas de Soplado de Alta Presión (Cobre / Latón)
-        this.buildPneumaticAirLines(R, L);
+        // C. Rack de Módulos de Baterías (Grid ordenado de celdas industriales de potencia)
+        const batteryGroup = new THREE.Group();
+        batteryGroup.position.set(0, -R * 0.58 + 0.18, -0.20);
 
-        // G. Tanques de Lastre MBT (Proa y Popa) con Colectores de Inundación de Quilla
-        this.buildBallastTanks(R, L);
+        const cellW = 0.28;
+        const cellH = 0.32;
+        const cellD = 0.44;
+        const cellGeo = new THREE.BoxGeometry(cellW, cellH, cellD);
+        const termGeo = new THREE.BoxGeometry(cellW * 0.85, 0.025, cellD * 0.85);
 
-        // H. Partículas de Agitación y Aeración Interna en los Tanques
-        this.initInternalTankAeration();
-    }
+        // 2 filas de 4 módulos (8 baterías en total)
+        for (let row = 0; row < 2; row++) {
+            const rx = (row === 0 ? -0.22 : 0.22);
+            for (let col = 0; col < 4; col++) {
+                const rz = -0.75 + col * 0.50;
 
-    /**
-     * Detalles del Mamparo Estanco: Marco de escotilla tubular, nervaduras y trincas de bronce
-     */
-    buildBulkheadDetails(bulkheadMesh, radius, portalRadius) {
-        // Marco toroidal reforzado de la escotilla estanca
-        const hatchRingGeo = new THREE.TorusGeometry(portalRadius, 0.045, 12, 32);
-        const hatchRing = new THREE.Mesh(hatchRingGeo, this.detailMat);
-        bulkheadMesh.add(hatchRing);
+                const cell = new THREE.Mesh(cellGeo, this.batteryMat);
+                cell.position.set(rx, 0, rz);
+                batteryGroup.add(cell);
 
-        // 8 Nervaduras radiales de refuerzo entre el marco central y el perímetro
-        const numSpokes = 8;
-        const spokeLen = radius - portalRadius;
-        const spokeGeo = new THREE.BoxGeometry(0.04, spokeLen, 0.035);
-
-        for (let j = 0; j < numSpokes; j++) {
-            const spoke = new THREE.Mesh(spokeGeo, this.detailMat);
-            const ang = (Math.PI * 2 / numSpokes) * j;
-            const midR = portalRadius + spokeLen / 2;
-            spoke.position.set(Math.cos(ang) * midR, Math.sin(ang) * midR, 0.02);
-            spoke.rotation.z = ang - Math.PI / 2;
-            bulkheadMesh.add(spoke);
+                const term = new THREE.Mesh(termGeo, this.detailMat);
+                term.position.set(rx, cellH / 2 + 0.015, rz);
+                batteryGroup.add(term);
+            }
         }
+        this.internalGroup.add(batteryGroup);
 
-        // 6 Trincas de bronce de cierre de alta presión alrededor de la escotilla
-        const dogGeo = new THREE.BoxGeometry(0.03, 0.06, 0.04);
-        for (let d = 0; d < 6; d++) {
-            const dog = new THREE.Mesh(dogGeo, this.bronzeMat);
-            const dAng = (Math.PI * 2 / 6) * d;
-            dog.position.set(Math.cos(dAng) * (portalRadius * 1.05), Math.sin(dAng) * (portalRadius * 1.05), 0.04);
-            dog.rotation.z = dAng;
-            bulkheadMesh.add(dog);
-        }
+        // D. Depósito Cilíndrico de Aire Comprimido (Soplado) - UN depósito superior central
+        const airTankGroup = new THREE.Group();
+        const tankR = 0.22;
+        const tankL = 1.35;
+        airTankGroup.position.set(0, R * 0.46, -0.25);
+
+        // Cuerpo cilíndrico plateado
+        const tankBodyGeo = new THREE.CylinderGeometry(tankR, tankR, tankL, 24);
+        tankBodyGeo.rotateX(Math.PI / 2);
+        const tankBody = new THREE.Mesh(tankBodyGeo, this.airTankMat);
+        airTankGroup.add(tankBody);
+
+        // Tapas hemisféricas redondeadas
+        const capGeo = new THREE.SphereGeometry(tankR, 20, 14);
+        const fwdCap = new THREE.Mesh(capGeo, this.airTankMat);
+        fwdCap.position.z = tankL / 2;
+        airTankGroup.add(fwdCap);
+
+        const aftCap = new THREE.Mesh(capGeo, this.airTankMat);
+        aftCap.position.z = -tankL / 2;
+        airTankGroup.add(aftCap);
+
+        // Cunas de montaje de acero al chasis
+        const cradleGeo = new THREE.BoxGeometry(0.55, 0.045, 0.08);
+        const cradleFwd = new THREE.Mesh(cradleGeo, this.detailMat);
+        cradleFwd.position.set(0, -tankR - 0.02, 0.35);
+        airTankGroup.add(cradleFwd);
+
+        const cradleAft = new THREE.Mesh(cradleGeo, this.detailMat);
+        cradleAft.position.set(0, -tankR - 0.02, -0.35);
+        airTankGroup.add(cradleAft);
+
+        // Manifold de control y válvula superior en T
+        const tManifoldGeo = new THREE.CylinderGeometry(0.045, 0.045, 0.20, 16);
+        const tManifold = new THREE.Mesh(tManifoldGeo, this.detailMat);
+        tManifold.position.set(0, tankR + 0.10, 0);
+        airTankGroup.add(tManifold);
+
+        this.internalGroup.add(airTankGroup);
+
+        // E. Red de Tuberías Neumáticas de Soplado (Acero inoxidable / cromo pulido)
+        const pipeRadius = 0.034;
+
+        // Tubería de alta presión que sale del manifold superior hacia el mamparo popel (-Z)
+        const airLineGeo = new THREE.CylinderGeometry(pipeRadius, pipeRadius, 2.65, 16);
+        airLineGeo.rotateX(Math.PI / 2);
+        const airLine = new THREE.Mesh(airLineGeo, this.pipeMat);
+        airLine.position.set(0, R * 0.70, -1.60);
+        this.internalGroup.add(airLine);
+
+        // Codo de bajada que inyecta aire al tanque de popa
+        const aftElbowGeo = new THREE.CylinderGeometry(pipeRadius, pipeRadius, 0.45, 16);
+        const aftElbow = new THREE.Mesh(aftElbowGeo, this.pipeMat);
+        aftElbow.position.set(0, R * 0.48, -2.90);
+        this.internalGroup.add(aftElbow);
+
+        // Tuberías de distribución interna que pasan por el mamparo proel (+Z)
+        const fwdDistPipeGeo = new THREE.CylinderGeometry(pipeRadius * 1.1, pipeRadius * 1.1, 1.8, 16);
+        fwdDistPipeGeo.rotateX(Math.PI / 2);
+        const fwdDistPipe = new THREE.Mesh(fwdDistPipeGeo, this.pipeMat);
+        fwdDistPipe.position.set(-0.35, -R * 0.35, 1.6);
+        this.internalGroup.add(fwdDistPipe);
+
+        // F. Bomba Eléctrica de Evacuación / Achique (Cilindro azul en el tanque de popa de la referencia UTP)
+        const pumpGroup = new THREE.Group();
+        // Ubicada exactamente en el compartimento de popa (-Z) justo tras el mamparo estanco popel
+        pumpGroup.position.set(0.25, -R * 0.48, -1.95);
+
+        const motorBodyGeo = new THREE.CylinderGeometry(0.14, 0.14, 0.42, 24);
+        motorBodyGeo.rotateX(Math.PI / 2);
+        const motorBody = new THREE.Mesh(motorBodyGeo, this.pumpBlueMat);
+        pumpGroup.add(motorBody);
+
+        const pumpHeadGeo = new THREE.CylinderGeometry(0.16, 0.16, 0.18, 24);
+        pumpHeadGeo.rotateX(Math.PI / 2);
+        const pumpHead = new THREE.Mesh(pumpHeadGeo, this.detailMat);
+        pumpHead.position.z = -0.28;
+        pumpGroup.add(pumpHead);
+
+        const pumpBaseGeo = new THREE.BoxGeometry(0.28, 0.05, 0.44);
+        const pumpBase = new THREE.Mesh(pumpBaseGeo, this.detailMat);
+        pumpBase.position.y = -0.16;
+        pumpGroup.add(pumpBase);
+
+        // Tubería de succión de la bomba hacia el fondo del tanque
+        const pumpSuctionGeo = new THREE.CylinderGeometry(pipeRadius, pipeRadius, 0.32, 16);
+        const pumpSuction = new THREE.Mesh(pumpSuctionGeo, this.pipeMat);
+        pumpSuction.position.set(0, -0.28, -0.28);
+        pumpGroup.add(pumpSuction);
+
+        this.internalGroup.add(pumpGroup);
+
+        // G. VÁLVULA DE INUNDACIÓN (1) con Volante Rojo bajo el tanque de proa
+        const floodValveGroup = new THREE.Group();
+        floodValveGroup.position.set(0, -R - 0.06, 2.40);
+
+        // Tramo de tubería vertical desde el fondo del casco
+        const fwdPipeL1 = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.42, 16), this.pipeMat);
+        fwdPipeL1.position.set(0, 0.20, 0.60);
+        floodValveGroup.add(fwdPipeL1);
+
+        // Tramo horizontal con la válvula
+        const fwdPipeL2 = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 1.40, 16), this.pipeMat);
+        fwdPipeL2.rotateX(Math.PI / 2);
+        fwdPipeL2.position.set(0, -0.01, 0.0);
+        floodValveGroup.add(fwdPipeL2);
+
+        // Subida al casco
+        const fwdPipeL3 = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.38, 16), this.pipeMat);
+        fwdPipeL3.position.set(0, 0.18, -0.65);
+        floodValveGroup.add(fwdPipeL3);
+
+        // Volante de válvula rojo orientado hacia el observador (+X) para máxima visibilidad
+        const wheelGeo = new THREE.TorusGeometry(0.13, 0.022, 12, 24);
+        wheelGeo.rotateY(Math.PI / 2); // Orientación normal al eje X
+        const fwdWheel = new THREE.Mesh(wheelGeo, this.valveRedMat);
+        fwdWheel.position.set(0.16, -0.01, 0.0);
+        floodValveGroup.add(fwdWheel);
+
+        const wheelStem = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.18, 12), this.detailMat);
+        wheelStem.rotation.z = Math.PI / 2;
+        wheelStem.position.set(0.08, -0.01, 0.0);
+        floodValveGroup.add(wheelStem);
+
+        this.ventralGroup.add(floodValveGroup);
+
+        // H. VÁLVULA DE EVACUACIÓN (2) con Volante Rojo bajo el tanque de popa
+        const evacValveGroup = new THREE.Group();
+        evacValveGroup.position.set(0, -R - 0.06, -2.40);
+
+        const aftPipeL1 = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.42, 16), this.pipeMat);
+        aftPipeL1.position.set(0, 0.20, -0.60);
+        evacValveGroup.add(aftPipeL1);
+
+        const aftPipeL2 = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 1.40, 16), this.pipeMat);
+        aftPipeL2.rotateX(Math.PI / 2);
+        aftPipeL2.position.set(0, -0.01, 0.0);
+        evacValveGroup.add(aftPipeL2);
+
+        const aftPipeL3 = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.38, 16), this.pipeMat);
+        aftPipeL3.position.set(0, 0.18, 0.65);
+        evacValveGroup.add(aftPipeL3);
+
+        const aftWheel = new THREE.Mesh(wheelGeo, this.valveRedMat);
+        aftWheel.position.set(0.16, -0.01, 0.0);
+        evacValveGroup.add(aftWheel);
+
+        const aftStem = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.18, 12), this.detailMat);
+        aftStem.rotation.z = Math.PI / 2;
+        aftStem.position.set(0.08, -0.01, 0.0);
+        evacValveGroup.add(aftStem);
+
+        this.ventralGroup.add(evacValveGroup);
+
+        this.hullGroup.add(this.ventralGroup);
     }
 
     /**
-     * Banco Central de 6 Botellones de Aire de Alta Presión (200 bar) con Cunas y Manómetros
+     * Adornos de anillos y pernos en los mamparos estancos
      */
-    buildHighPressureAirBank(R) {
-        const airBankGroup = new THREE.Group();
-        airBankGroup.position.set(0, -R * 0.22, 0);
+    buildBulkheadTrim(bulkheadMesh, radius, portalRadius) {
+        const ringGeo = new THREE.TorusGeometry(portalRadius, 0.035, 12, 32);
+        const ring = new THREE.Mesh(ringGeo, this.detailMat);
+        bulkheadMesh.add(ring);
 
-        const flaskRadius = 0.125;
-        const flaskLength = 1.60;
-
-        const flaskCylGeo = new THREE.CylinderGeometry(flaskRadius, flaskRadius, flaskLength, 20);
-        flaskCylGeo.rotateX(Math.PI / 2);
-        const flaskCapGeo = new THREE.SphereGeometry(flaskRadius, 16, 12);
-
-        // Cunas transversales de acero que fijan los botellones a la estructura
-        const cradleGeo = new THREE.BoxGeometry(0.95, 0.06, 0.08);
-        const cradle1 = new THREE.Mesh(cradleGeo, this.steelDarkMat);
-        cradle1.position.set(0, -0.22, 0.45);
-        airBankGroup.add(cradle1);
-
-        const cradle2 = new THREE.Mesh(cradleGeo, this.steelDarkMat);
-        cradle2.position.set(0, -0.22, -0.45);
-        airBankGroup.add(cradle2);
-
-        // 6 botellones de aire comprimido dispuestos en matriz simétrica 2 x 3
-        const flaskPositions = [
-            [-0.34, -0.12], [0, -0.12], [0.34, -0.12],
-            [-0.34, 0.16], [0, 0.16], [0.34, 0.16]
-        ];
-
-        for (const [fx, fy] of flaskPositions) {
-            const flaskMesh = new THREE.Mesh(flaskCylGeo, this.airFlaskMat);
-            flaskMesh.position.set(fx, fy, 0);
-
-            // Tapas semiesféricas de alta presión
-            const capFwd = new THREE.Mesh(flaskCapGeo, this.airFlaskMat);
-            capFwd.position.z = flaskLength / 2;
-            flaskMesh.add(capFwd);
-
-            const capAft = new THREE.Mesh(flaskCapGeo, this.airFlaskMat);
-            capAft.position.z = -flaskLength / 2;
-            flaskMesh.add(capAft);
-
-            // Válvula de corte de bronce en el cabezal frontal
-            const valveGeo = new THREE.CylinderGeometry(0.035, 0.035, 0.10, 12);
-            valveGeo.rotateX(Math.PI / 2);
-            const valve = new THREE.Mesh(valveGeo, this.bronzeMat);
-            valve.position.z = flaskLength / 2 + 0.14;
-            flaskMesh.add(valve);
-
-            // Abrazaderas metálicas reflectivas
-            const clampGeo = new THREE.TorusGeometry(flaskRadius * 1.05, 0.015, 8, 20);
-            const clamp1 = new THREE.Mesh(clampGeo, this.detailMat);
-            clamp1.position.z = flaskLength * 0.28;
-            flaskMesh.add(clamp1);
-            const clamp2 = new THREE.Mesh(clampGeo, this.detailMat);
-            clamp2.position.z = -flaskLength * 0.28;
-            flaskMesh.add(clamp2);
-
-            airBankGroup.add(flaskMesh);
-        }
-
-        // Manómetro analógico de aguja indicador de presión a 200 bar
-        const gaugeGroup = new THREE.Group();
-        gaugeGroup.position.set(0.48, 0.15, 0.65);
-
-        const gaugeBezel = new THREE.Mesh(new THREE.CylinderGeometry(0.10, 0.10, 0.04, 20), this.bronzeMat);
-        gaugeBezel.rotateX(Math.PI / 2);
-        gaugeGroup.add(gaugeBezel);
-
-        const gaugeDial = new THREE.Mesh(new THREE.CircleGeometry(0.088, 20), this.detailMat);
-        gaugeDial.position.z = 0.022;
-        gaugeGroup.add(gaugeDial);
-
-        const gaugeNeedle = new THREE.Mesh(new THREE.BoxGeometry(0.01, 0.07, 0.005), this.portNavMat);
-        gaugeNeedle.position.set(0.02, 0.02, 0.025);
-        gaugeNeedle.rotation.z = -Math.PI / 4;
-        gaugeGroup.add(gaugeNeedle);
-
-        airBankGroup.add(gaugeGroup);
-
-        this.internalGroup.add(airBankGroup);
+        const outerRingGeo = new THREE.TorusGeometry(radius * 0.98, 0.025, 10, 36);
+        const outerRing = new THREE.Mesh(outerRingGeo, this.detailMat);
+        bulkheadMesh.add(outerRing);
     }
 
     /**
-     * Red de Tuberías Neumáticas de Distribución de Aire (Manifold)
-     */
-    buildPneumaticAirLines(R, L) {
-        const pipeRadius = 0.035;
-
-        // Colector principal horizontal superior (Corre a lo largo del techo entre mamparos)
-        const spinePipeGeo = new THREE.CylinderGeometry(pipeRadius, pipeRadius, L * 0.55, 16);
-        spinePipeGeo.rotateX(Math.PI / 2);
-        const spinePipe = new THREE.Mesh(spinePipeGeo, this.copperPipeMat);
-        spinePipe.position.set(0, R * 0.72, 0);
-        this.internalGroup.add(spinePipe);
-
-        // Válvulas reguladoras de soplado a los tanques de proa y popa
-        const regValveGeo = new THREE.BoxGeometry(0.14, 0.14, 0.18);
-
-        const fwdReg = new THREE.Mesh(regValveGeo, this.bronzeMat);
-        fwdReg.position.set(0, R * 0.72, L * 0.25);
-        this.internalGroup.add(fwdReg);
-
-        const aftReg = new THREE.Mesh(regValveGeo, this.bronzeMat);
-        aftReg.position.set(0, R * 0.72, -L * 0.25);
-        this.internalGroup.add(aftReg);
-
-        // Bajantes verticales de aire comprimido a la cúspide de cada tanque
-        const dropPipeGeo = new THREE.CylinderGeometry(pipeRadius * 0.85, pipeRadius * 0.85, R * 0.25, 12);
-
-        const fwdDrop = new THREE.Mesh(dropPipeGeo, this.copperPipeMat);
-        fwdDrop.position.set(0, R * 0.58, L * 0.25);
-        this.internalGroup.add(fwdDrop);
-
-        const aftDrop = new THREE.Mesh(dropPipeGeo, this.copperPipeMat);
-        aftDrop.position.set(0, R * 0.58, -L * 0.25);
-        this.internalGroup.add(aftDrop);
-    }
-
-    /**
-     * Tanques de Lastre Principal (MBT) y Tuberías de Inundación de Quilla
+     * 5. Tanques de Lastre Principal a Sección Completa (Proa y Popa)
+     * En la referencia UTP, el agua ocupa la sección completa del casco cilíndrico
+     * entre la proa y el mamparo proel (+Z), y entre el mamparo popel y la popa (-Z).
      */
     buildBallastTanks(R, L) {
-        this.tankRadius = R * 0.60;
-        this.tankLength = L * 0.28;
+        this.tankRadius = R * 0.965; // Ocupa toda la sección útil del acrílico
+        const rEff = this.tankRadius * 0.99;
 
-        const rEff = this.tankRadius * 0.98;
-        const lEff = this.tankLength * 0.98;
+        // Longitud del compartimento de tanques (entre mamparo y bridas extremas)
+        const tankLength = 3.50;
+        this.tankLength = tankLength;
+        const fwdZ = 3.20;
+        const aftZ = -3.20;
 
-        // Cilíndros translúcidos estructurales de tanque
-        const tankVisGeo = new THREE.CylinderGeometry(this.tankRadius, this.tankRadius, this.tankLength, 28);
-        tankVisGeo.rotateX(Math.PI / 2);
+        // Malla de fluido cilíndrica de Proa
+        const fwdWaterGeo = new THREE.CylinderGeometry(rEff, rEff, tankLength, 48);
+        fwdWaterGeo.rotateX(Math.PI / 2);
 
-        const tankFront = new THREE.Mesh(tankVisGeo, this.tankShellMat);
-        tankFront.position.set(0, 0, L * 0.25);
-        this.internalGroup.add(tankFront);
-
-        const tankBack = new THREE.Mesh(tankVisGeo, this.tankShellMat);
-        tankBack.position.set(0, 0, -L * 0.25);
-        this.internalGroup.add(tankBack);
-
-        // Anillos metálicos de mamparo en los extremos de los tanques
-        const bulkheadGeo = new THREE.TorusGeometry(this.tankRadius, 0.038, 12, 36);
-        const fwdTankZ = L * 0.25;
-        const aftTankZ = -L * 0.25;
-
-        const bhFwd1 = new THREE.Mesh(bulkheadGeo, this.detailMat);
-        bhFwd1.position.z = fwdTankZ + this.tankLength / 2;
-        this.internalGroup.add(bhFwd1);
-
-        const bhFwd2 = new THREE.Mesh(bulkheadGeo, this.detailMat);
-        bhFwd2.position.z = fwdTankZ - this.tankLength / 2;
-        this.internalGroup.add(bhFwd2);
-
-        const bhAft1 = new THREE.Mesh(bulkheadGeo, this.detailMat);
-        bhAft1.position.z = aftTankZ + this.tankLength / 2;
-        this.internalGroup.add(bhAft1);
-
-        const bhAft2 = new THREE.Mesh(bulkheadGeo, this.detailMat);
-        bhAft2.position.z = aftTankZ - this.tankLength / 2;
-        this.internalGroup.add(bhAft2);
-
-        // Colectores de Inundación de Fondo (Válvulas Kingston hacia la quilla)
-        const floodPipeGeo = new THREE.CylinderGeometry(0.065, 0.065, R * 0.40, 16);
-        const kingstonBoxGeo = new THREE.BoxGeometry(0.24, 0.12, 0.35);
-
-        const fwdFloodPipe = new THREE.Mesh(floodPipeGeo, this.steelDarkMat);
-        fwdFloodPipe.position.set(0, -this.tankRadius - 0.15, fwdTankZ);
-        this.internalGroup.add(fwdFloodPipe);
-
-        const fwdKingston = new THREE.Mesh(kingstonBoxGeo, this.detailMat);
-        fwdKingston.position.set(0, -R * 0.90, fwdTankZ);
-        this.internalGroup.add(fwdKingston);
-
-        const aftFloodPipe = new THREE.Mesh(floodPipeGeo, this.steelDarkMat);
-        aftFloodPipe.position.set(0, -this.tankRadius - 0.15, aftTankZ);
-        this.internalGroup.add(aftFloodPipe);
-
-        const aftKingston = new THREE.Mesh(kingstonBoxGeo, this.detailMat);
-        aftKingston.position.set(0, -R * 0.90, aftTankZ);
-        this.internalGroup.add(aftKingston);
-
-        // Mallas de volumen de agua viva dentro de los tanques
-        const waterGeo = new THREE.CylinderGeometry(rEff, rEff, lEff, 36);
-        waterGeo.rotateX(Math.PI / 2);
-
-        this.fwdWaterMesh = new THREE.Mesh(waterGeo, this.fwdWaterMat);
-        this.fwdWaterMesh.position.set(0, 0, fwdTankZ);
+        this.fwdWaterMesh = new THREE.Mesh(fwdWaterGeo, this.fwdWaterMat);
+        this.fwdWaterMesh.renderOrder = 2;
+        this.fwdWaterMesh.position.set(0, 0, fwdZ);
         this.internalGroup.add(this.fwdWaterMesh);
 
-        this.aftWaterMesh = new THREE.Mesh(waterGeo, this.aftWaterMat);
-        this.aftWaterMesh.position.set(0, 0, aftTankZ);
+        // Malla de fluido cilíndrica de Popa
+        const aftWaterGeo = new THREE.CylinderGeometry(rEff, rEff, tankLength, 48);
+        aftWaterGeo.rotateX(Math.PI / 2);
+
+        this.aftWaterMesh = new THREE.Mesh(aftWaterGeo, this.aftWaterMat);
+        this.aftWaterMesh.renderOrder = 2;
+        this.aftWaterMesh.position.set(0, 0, aftZ);
         this.internalGroup.add(this.aftWaterMesh);
 
-        // Superficies de nivel líquido horizontales (Meniscos dinámicos)
-        const surfGeo = new THREE.PlaneGeometry(rEff * 2.0, lEff, 16, 16);
-        surfGeo.rotateX(-Math.PI / 2);
+        // Superficie líquida horizontal (Menisco dinámico transversal a sección completa)
+        const surfGeo1 = new THREE.PlaneGeometry(rEff * 2.0, tankLength, 24, 24);
+        surfGeo1.rotateX(-Math.PI / 2);
 
-        this.fwdWaterSurface = new THREE.Mesh(surfGeo, this.waterSurfaceMat.clone());
-        this.fwdWaterSurface.position.set(0, 0, fwdTankZ);
+        this.fwdWaterSurface = new THREE.Mesh(surfGeo1, this.waterSurfaceMat);
+        this.fwdWaterSurface.renderOrder = 3;
+        this.fwdWaterSurface.position.set(0, 0, fwdZ);
         this.internalGroup.add(this.fwdWaterSurface);
 
-        this.aftWaterSurface = new THREE.Mesh(surfGeo, this.waterSurfaceMat.clone());
-        this.aftWaterSurface.position.set(0, 0, aftTankZ);
+        const surfGeo2 = new THREE.PlaneGeometry(rEff * 2.0, tankLength, 24, 24);
+        surfGeo2.rotateX(-Math.PI / 2);
+
+        this.aftWaterSurface = new THREE.Mesh(surfGeo2, this.waterSurfaceMat);
+        this.aftWaterSurface.renderOrder = 3;
+        this.aftWaterSurface.position.set(0, 0, aftZ);
         this.internalGroup.add(this.aftWaterSurface);
     }
 
     /**
-     * Sistema de aeración interna y micro-burbujas dentro de los tanques
+     * Partículas dinámicas de aeración y turbulencia dentro de los tanques de lastre
      */
     initInternalTankAeration() {
-        const count = 140;
+        const count = 120;
         const geom = new THREE.BufferGeometry();
         const positions = new Float32Array(count * 3);
         const offsets = new Float32Array(count * 3);
 
-        const L = this.hullCylLen;
-        const rEff = this.tankRadius * 0.85;
+        const R = this.SUB_RADIUS;
+        const tankL = this.tankLength || 3.50;
 
         for (let i = 0; i < count; i++) {
             const isFwd = i < count / 2;
-            const zCenter = isFwd ? (L * 0.25) : (-L * 0.25);
+            const zBase = isFwd ? 3.20 : -3.20;
 
-            const rx = (Math.random() - 0.5) * (rEff * 1.6);
-            const ry = (Math.random() - 0.5) * (rEff * 0.6);
-            const rz = zCenter + (Math.random() - 0.5) * (this.tankLength * 0.85);
+            const rx = (Math.random() - 0.5) * (R * 1.4);
+            const ry = -R * 0.4 + (Math.random() - 0.5) * (R * 0.8);
+            const rz = zBase + (Math.random() - 0.5) * (tankL * 0.85);
 
             positions[i * 3] = rx;
             positions[i * 3 + 1] = ry;
@@ -1008,7 +889,7 @@ export class SubmarineModel {
         const tex = new THREE.CanvasTexture(canvas);
 
         this.internalAerationMat = new THREE.PointsMaterial({
-            size: 0.20,
+            size: 0.22,
             map: tex,
             transparent: true,
             opacity: 0.0,
@@ -1017,18 +898,136 @@ export class SubmarineModel {
         });
 
         this.internalAerationPoints = new THREE.Points(geom, this.internalAerationMat);
+        this.internalAerationPoints.renderOrder = 4;
         this.internalAerationOffsets = offsets;
         this.internalGroup.add(this.internalAerationPoints);
     }
 
     /**
+     * Construcción de Etiquetas Técnicas 3D y Líneas de Guía Coincidentes con la Referencia UTP
+     */
+    buildCalloutLabels() {
+        this.calloutsGroup.clear();
+        const R = this.SUB_RADIUS;
+
+        // 8 Etiquetas técnicas exactas con líneas de guía coincidentes con el diagrama técnico UTP
+        // Coordenadas calibradas para vista isométrica y lateral desde el cuadrante del usuario (+X)
+        const annotations = [
+            {
+                text: 'Válvula de Purga de Aire (Venteo)',
+                target: new THREE.Vector3(0, R + 0.28, 3.45),
+                pos: new THREE.Vector3(1.8, R + 1.25, 3.6)
+            },
+            {
+                text: 'Tanque de Proa',
+                target: new THREE.Vector3(R * 0.7, 0.35, 3.2),
+                pos: new THREE.Vector3(3.2, 0.75, 3.8)
+            },
+            {
+                text: 'Tanque de Lastre de Inundación y Venteo',
+                target: new THREE.Vector3(R * 0.75, -0.45, 3.2),
+                pos: new THREE.Vector3(3.2, -R - 0.85, 3.4)
+            },
+            {
+                text: 'VALVULA DE INUNDACIÓN (1)',
+                target: new THREE.Vector3(0.35, -R - 0.24, 2.4),
+                pos: new THREE.Vector3(1.6, -R - 0.95, 2.0)
+            },
+            {
+                text: 'Depósito de Aire Comprimido (Soplado)',
+                target: new THREE.Vector3(0, R * 0.46 + 0.16, -0.25),
+                pos: new THREE.Vector3(0.8, R + 1.85, -0.2)
+            },
+            {
+                text: 'Mamparos y Pasamuros Estancos',
+                target: new THREE.Vector3(0.6, -0.2, 1.40),
+                pos: new THREE.Vector3(1.6, -R - 0.85, 0.6)
+            },
+            {
+                text: 'Tanque de Popa',
+                target: new THREE.Vector3(0.5, 0.6, -3.2),
+                pos: new THREE.Vector3(1.4, R + 1.65, -3.4)
+            },
+            {
+                text: 'VALVULA DE EVACUACIÓN (2)',
+                target: new THREE.Vector3(0.35, -R - 0.24, -2.4),
+                pos: new THREE.Vector3(1.4, -R - 0.95, -2.6)
+            }
+        ];
+
+        const dotGeo = new THREE.SphereGeometry(0.045, 12, 12);
+        const dotMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
+
+        for (const a of annotations) {
+            const sprite = this.createCalloutSprite(a.text);
+            sprite.position.copy(a.pos);
+            this.calloutsGroup.add(sprite);
+
+            const lineGeom = new THREE.BufferGeometry().setFromPoints([a.target, a.pos]);
+            const lineMat = new THREE.LineBasicMaterial({
+                color: 0x38bdf8,
+                transparent: true,
+                opacity: 0.75,
+                depthTest: false,
+            });
+            const line = new THREE.Line(lineGeom, lineMat);
+            this.calloutsGroup.add(line);
+
+            // Pin de localización en el componente técnico
+            const dot = new THREE.Mesh(dotGeo, dotMat);
+            dot.position.copy(a.target);
+            this.calloutsGroup.add(dot);
+        }
+
+        // Visible de forma predeterminada
+        this.calloutsGroup.visible = true;
+    }
+
+    toggleCallouts(forceState) {
+        const nextState = (forceState !== undefined) ? forceState : ((this.state?.showCallouts !== false) ? false : true);
+        if (this.state) {
+            this.state.showCallouts = nextState;
+        }
+        this.calloutsGroup.visible = nextState;
+        return nextState;
+    }
+
+    createCalloutSprite(text) {
+        const canvas = document.createElement('canvas');
+        canvas.width = 512;
+        canvas.height = 80;
+        const ctx = canvas.getContext('2d');
+
+        ctx.fillStyle = 'rgba(10, 20, 34, 0.72)';
+        ctx.strokeStyle = 'rgba(56, 189, 248, 0.45)';
+        ctx.lineWidth = 2;
+        
+        ctx.beginPath();
+        ctx.roundRect(4, 4, canvas.width - 8, canvas.height - 8, 6);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.font = 'bold 22px "Inter", "Segoe UI", Arial, sans-serif';
+        ctx.fillStyle = '#f8fafc';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+        ctx.shadowBlur = 4;
+        ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+
+        const tex = new THREE.CanvasTexture(canvas);
+        const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false });
+        const sprite = new THREE.Sprite(mat);
+        sprite.scale.set(3.4, 0.55, 1.0);
+        return sprite;
+    }
+
+    /**
      * Construcción de Vectores 3D de Fuerza (Empuje verde y Peso rojo)
-     * Desplazamiento longitudinal sutil para evitar oclusión perfecta en vista cenital/nadir
      */
     buildForceVectors() {
         const R = this.SUB_RADIUS;
 
-        // Flecha de Empuje (E): Inicia sobre la cumbre de la vela y apunta al cenit
         this.buoyancyArrow = new THREE.ArrowHelper(
             new THREE.Vector3(0, 1, 0),
             new THREE.Vector3(0, R + 1.8, 0),
@@ -1038,7 +1037,6 @@ export class SubmarineModel {
             0.9
         );
 
-        // Flecha de Peso (W): Inicia bajo la quilla y apunta al lecho marino
         this.weightArrow = new THREE.ArrowHelper(
             new THREE.Vector3(0, -1, 0),
             new THREE.Vector3(0, -R - 0.4, 0),
@@ -1054,8 +1052,6 @@ export class SubmarineModel {
         this.buoyancyLabel = this.createVectorSprite('Empuje (E)', '#00e676');
         this.weightLabel = this.createVectorSprite('Peso (W)', '#ff1744');
 
-        // Desplazamiento lateral (eje X) para Empuje y Peso
-        // Esto sitúa los rótulos en agua abierta a ambos lados del casco en vista cenital y nadir
         this.buoyancyLabel.position.set(-3.2, 8.5, 0);
         this.weightLabel.position.set(3.2, -8.5, 0);
 
@@ -1088,11 +1084,11 @@ export class SubmarineModel {
 
     setXrayMode(enabled) {
         if (enabled) {
-            this.hullMat.opacity = 0.72;
-            this.hullMat.transmission = 0.28;
+            this.hullMat.opacity = 0.65;
+            this.hullMat.transmission = 0.45;
         } else {
-            this.hullMat.opacity = 0.95;
-            this.hullMat.transmission = 0.05;
+            this.hullMat.opacity = 0.32;
+            this.hullMat.transmission = 0.92;
         }
     }
 
@@ -1146,7 +1142,7 @@ export class SubmarineModel {
 
             // Ajustar posición vertical de la vela y quilla para seguir la superficie del cilindro elástico
             if (this.sailGroup) {
-                this.sailGroup.position.set(0, (R * 0.70) * scaleVertical, L * 0.20);
+                this.sailGroup.position.set(0, (R * 0.70) * scaleVertical, 0.65);
                 this.sailGroup.rotation.set(0, 0, 0);
             }
             if (this.ventralGroup) {
@@ -1169,7 +1165,6 @@ export class SubmarineModel {
             const crushHeight = (collapseRad * 1.18) + buckleCos;
 
             if (this.mainHull) {
-                // Longitud axial se mantiene en 1.0 sin desconectar los mamparos
                 this.mainHull.scale.set(crushWidth, 1.0, crushHeight);
                 this.mainHull.position.set(buckleSine * 0.15, -0.15 * this.implosionT, 0);
             }
@@ -1181,9 +1176,8 @@ export class SubmarineModel {
             if (this.aftFlange) this.aftFlange.scale.set(crushWidth, crushHeight, 1.0);
 
             if (this.sailGroup) {
-                // La vela colapsa sobre el casco comprimido y se tuerce
                 const sailDropY = (R * 0.70) * crushHeight - (0.15 * this.implosionT);
-                this.sailGroup.position.set(buckleSine * 0.1, sailDropY, L * 0.20);
+                this.sailGroup.position.set(buckleSine * 0.1, sailDropY, 0.65);
                 this.sailGroup.rotation.z = 0.42 * this.implosionT;
                 this.sailGroup.rotation.x = -0.16 * this.implosionT;
             }
@@ -1192,7 +1186,6 @@ export class SubmarineModel {
                 this.ventralGroup.scale.set(crushWidth, 1.0, 1.0);
             }
             if (this.propellerGroup) {
-                // Deformación del eje propulsor por colapso popel
                 this.propellerGroup.rotation.x = 0.30 * this.implosionT;
             }
 
@@ -1234,14 +1227,14 @@ export class SubmarineModel {
         const fwdFrac = Math.max(0.0, Math.min(1.0, fwdRaw / 100.0));
         const aftFrac = Math.max(0.0, Math.min(1.0, aftRaw / 100.0));
 
-        const rEff = this.tankRadius * 0.98;
+        const rEff = (this.tankRadius || R * 0.965) * 0.99;
+        const fwdZ = 3.20;
+        const aftZ = -3.20;
 
         // Perturbación ondulatoria del menisco durante llenado o soplado activo
         const isAgitated = this.state.isFilling || this.state.isBlowing;
         const waveJitter = isAgitated ? Math.sin(this.state.simTime * 14.0) * 0.012 : 0.0;
 
-        // Vector normal local del tanque hacia abajo (0, -1, 0) transformado a coordenadas de mundo
-        // Esto garantiza que el plano de corte siga exactamente la orientación del cilindro ante cabeceo
         const downLocal = new THREE.Vector3(0, -1, 0);
         const downWorld = downLocal.clone().transformDirection(this.internalGroup.matrixWorld);
 
@@ -1266,11 +1259,10 @@ export class SubmarineModel {
                 const chordHalf = Math.sqrt(Math.max(0.005, (rEff * rEff) - (yLocal * yLocal)));
                 const scaleX = chordHalf / rEff;
 
-                this.fwdWaterSurface.position.set(0, yLocal + waveJitter, L * 0.25);
+                this.fwdWaterSurface.position.set(0, yLocal + waveJitter, fwdZ);
                 this.fwdWaterSurface.scale.set(scaleX, 1.0, 1.0);
 
-                // Transformar posición del menisco a coordenadas de mundo y fijar plano coplanar
-                const localMeniscus = new THREE.Vector3(0, yLocal + waveJitter, L * 0.25);
+                const localMeniscus = new THREE.Vector3(0, yLocal + waveJitter, fwdZ);
                 const worldMeniscus = localMeniscus.applyMatrix4(this.internalGroup.matrixWorld);
 
                 this.fwdClipPlane.setFromNormalAndCoplanarPoint(downWorld, worldMeniscus);
@@ -1295,10 +1287,10 @@ export class SubmarineModel {
                 const chordHalf = Math.sqrt(Math.max(0.005, (rEff * rEff) - (yLocal * yLocal)));
                 const scaleX = chordHalf / rEff;
 
-                this.aftWaterSurface.position.set(0, yLocal + waveJitter, -L * 0.25);
+                this.aftWaterSurface.position.set(0, yLocal + waveJitter, aftZ);
                 this.aftWaterSurface.scale.set(scaleX, 1.0, 1.0);
 
-                const localMeniscus = new THREE.Vector3(0, yLocal + waveJitter, -L * 0.25);
+                const localMeniscus = new THREE.Vector3(0, yLocal + waveJitter, aftZ);
                 const worldMeniscus = localMeniscus.applyMatrix4(this.internalGroup.matrixWorld);
 
                 this.aftClipPlane.setFromNormalAndCoplanarPoint(downWorld, worldMeniscus);
@@ -1345,6 +1337,11 @@ export class SubmarineModel {
             const wLen = Math.max(minLen, Math.min(18.0, wForce * forceScale));
             this.weightArrow.setLength(wLen, Math.min(1.8, wLen * 0.25), 0.8);
             this.weightLabel.position.set(3.2, -(wLen + 3.0), 0);
+        }
+
+        // --- 5. ETIQUETAS TÉCNICAS UTP ---
+        if (this.calloutsGroup) {
+            this.calloutsGroup.visible = (this.state.showCallouts !== false);
         }
     }
 }
